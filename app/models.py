@@ -96,6 +96,25 @@ class Prediction(db.Model):
         return total
 
 
+class Setting(db.Model):
+    key   = db.Column(db.String(50), primary_key=True)
+    value = db.Column(db.String(200), nullable=False, default='false')
+
+    @staticmethod
+    def get(key, default='false'):
+        s = Setting.query.get(key)
+        return s.value if s else default
+
+    @staticmethod
+    def set(key, value):
+        s = Setting.query.get(key)
+        if s:
+            s.value = value
+        else:
+            from app import db
+            db.session.add(Setting(key=key, value=value))
+
+
 class RaceResult(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     race_id = db.Column(db.Integer, db.ForeignKey('race.id'), nullable=False, unique=True)

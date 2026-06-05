@@ -28,7 +28,8 @@
 
 {% if mode == 'tapia' %}
 <div class="lb-tabs mb-4" style="border-top:none;border-bottom:1px solid var(--border-subtle);margin-top:.75rem">
-  {% for h, label in [('overall','Overall'), ('h1','First Half'), ('h2','Second Half')] %}
+  {% set halves = [('overall','Overall'), ('h1','First Half'), ('h2','Second Half')] if show_overall else [('h1','First Half'), ('h2','Second Half')] %}
+  {% for h, label in halves %}
   <a href="{{ url_for('leaderboard.index', mode=mode, tab=tab, half=h) }}"
      class="lb-tab {% if half == h %}lb-tab-active{% endif %}"
      style="font-size:.78rem;padding:.4rem 1rem">

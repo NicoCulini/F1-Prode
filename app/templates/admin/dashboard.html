@@ -28,17 +28,17 @@
         <a href="{{ url_for('admin.users') }}" class="btn btn-outline-secondary btn-sm">Manage users</a>
         <a href="{{ url_for('admin.import_schedule') }}" class="btn btn-outline-secondary btn-sm">Import 2026 schedule</a>
         <a href="{{ url_for('admin.import_drivers') }}" class="btn btn-outline-secondary btn-sm">Import 2026 drivers</a>
+        <a href="{{ url_for('admin.toggle_overall') }}"
+           class="btn btn-sm {% if show_overall %}btn-outline-warning{% else %}btn-outline-secondary{% endif %}">
+          Overall standings: <strong>{{ 'Visible' if show_overall else 'Hidden' }}</strong>
+        </a>
       </div>
     </div>
   </div>
   <div class="col-md-7">
     <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center"
-           style="cursor:pointer" data-bs-toggle="collapse" data-bs-target="#setup-guide">
-        Setup guide
-        <span style="font-size:.7rem;color:var(--text-3)">▾</span>
-      </div>
-      <div id="setup-guide" class="collapse">
+      <div class="card-header">Setup guide</div>
+      <div>
         <div class="card-body">
           <ol style="color:var(--text-2);font-size:.875rem;line-height:2;margin:0;padding-left:1.25rem">
             <li>Import 2026 schedule — loads all races + sprints with auto half-split.</li>
@@ -53,3 +53,4 @@
   </div>
 </div>
 {% endblock %}
+

@@ -1,6 +1,6 @@
 from datetime import datetime
 from flask import Blueprint, render_template, request
-from app.models import User, Race, Prediction, RaceResult
+from app.models import User, Race, Prediction, RaceResult, Setting
 from config import Config
 
 
@@ -89,6 +89,11 @@ def index():
         h1 = {'combined': _build(1), 'races': _build(1, 'race'), 'sprints': _build(1, 'sprint')}
         h2 = {'combined': _build(2), 'races': _build(2, 'race'), 'sprints': _build(2, 'sprint')}
         overall = _tapia_overall(h1['combined'], h2['combined'])
+        show_overall = Setting.get('show_overall') == 'true'
+        # If overall is hidden and user somehow lands on it, redirect to h1
+        if not show_overall and half == 'overall':
+            half = 'h1'
         return render_template('leaderboard/index.html',
                                mode='tapia', tab=tab, half=half,
-                               h1=h1, h2=h2, overall=overall)
+                               h1=h1, h2=h2, overall=overall,
+                               show_overall=show_overall)

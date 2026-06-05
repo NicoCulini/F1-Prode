@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 from functools import wraps
 from app import db
-from app.models import Race, Driver, RaceResult, Prediction, User
+from app.models import Race, Driver, RaceResult, Prediction, User, Setting
 from app.scraper import fetch_season_schedule, fetch_season_drivers, fetch_race_result
 from config import Config
 
@@ -29,7 +29,20 @@ def dashboard():
         'completed': Race.query.filter_by(season=Config.CURRENT_SEASON, is_completed=True).count(),
         'drivers': Driver.query.filter_by(season=Config.CURRENT_SEASON).count(),
     }
-    return render_template('admin/dashboard.html', stats=stats)
+    show_overall = Setting.get('show_overall') == 'true'
+    return render_template('admin/dashboard.html', stats=stats, show_overall=show_overall)
+
+
+@admin_bp.route('/toggle-overall')
+@admin_required
+def toggle_overall():
+    current = Setting.get('show_overall')
+    new_val = 'false' if current == 'true' else 'true'
+    Setting.set('show_overall', new_val)
+    db.session.commit()
+    state = 'visible' if new_val == 'true' else 'hidden'
+    flash(f'Overall Tapia standings are now {state}.', 'success')
+    return redirect(url_for('admin.dashboard'))
 
 
 @admin_bp.route('/races')

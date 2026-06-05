@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Races — Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 style="font-family:'Titillium Web',sans-serif;font-weight:700;margin:0">Races</h4>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('admin.import_schedule') }}" class="btn btn-sm btn-outline-secondary">Import schedule</a>
+    <a href="{{ url_for('admin.import_drivers') }}" class="btn btn-sm btn-outline-secondary">Import drivers</a>
+  </div>
+</div>
+
+{% if races %}
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table mb-0 align-middle" style="font-size:.82rem">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Race</th>
+          <th class="d-none d-md-table-cell">Date</th>
+          <th class="text-center d-none d-sm-table-cell">Type</th>
+          <th class="text-center d-none d-md-table-cell">Half</th>
+          <th class="text-center d-none d-md-table-cell">Preds</th>
+          <th class="text-center d-none d-md-table-cell">Done</th>
+          <th class="d-none d-lg-table-cell">Result</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for race in races %}
+        <tr>
+          <td style="color:var(--text-muted)">{{ race.round_number }}</td>
+          <td style="font-weight:600">{{ race.name }}</td>
+          <td class="d-none d-md-table-cell" style="color:var(--text-secondary)">
+            {% if race.race_date %}{{ race.race_date.strftime('%d %b') }}{% else %}—{% endif %}
+          </td>
+          <td class="text-center d-none d-sm-table-cell">
+            <span class="badge-{{ race.race_type }}">{{ race.race_type }}</span>
+          </td>
+          <td class="text-center d-none d-md-table-cell">
+            <form method="POST" action="{{ url_for('admin.set_half', race_id=race.id) }}" class="d-inline">
+              <select name="half" class="half-select" onchange="this.form.submit()">
+                <option value="1" {% if race.season_half == 1 %}selected{% endif %}>H1</option>
+                <option value="2" {% if race.season_half == 2 %}selected{% endif %}>H2</option>
+              </select>
+            </form>
+          </td>
+          <td class="text-center d-none d-md-table-cell">
+            <a href="{{ url_for('admin.toggle_predictions', race_id=race.id) }}"
+               style="font-size:.72rem;font-weight:700;text-decoration:none;
+                      color:{% if race.predictions_open %}var(--green){% else %}var(--text-muted){% endif %}">
+              {{ 'Open' if race.predictions_open else 'Closed' }}
+            </a>
+          </td>
+          <td class="text-center d-none d-md-table-cell">
+            {% if race.is_completed %}
+              <span style="color:var(--green);font-size:.75rem">✓</span>
+            {% else %}
+              <span style="color:var(--text-muted);font-size:.75rem">—</span>
+            {% endif %}
+          </td>
+          <td class="d-none d-lg-table-cell" style="color:var(--text-secondary);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            {% if race.result %}
+              {{ race.result.pos1 }}{% if race.result.pos2 %}, {{ race.result.pos2 }}{% endif %}{% if race.result.pos3 %}, {{ race.result.pos3 }}{% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            <div class="d-flex gap-1 justify-content-end">
+              {% if race.race_type == 'race' %}
+              {% set has_sprint = races | selectattr('round_number','equalto',race.round_number) | selectattr('race_type','equalto','sprint') | list %}
+              {% if not has_sprint %}
+              <a href="{{ url_for('admin.add_sprint', race_id=race.id) }}"
+                 class="btn btn-xs btn-outline-warning" title="Add sprint">⚡</a>
+              {% endif %}
+              {% endif %}
+              <a href="{{ url_for('admin.fetch_result', race_id=race.id) }}"
+                 class="btn btn-xs btn-outline-secondary" title="Fetch result from API">↓</a>
+              <button class="btn btn-xs btn-outline-secondary" title="Enter result manually"
+                      data-bs-toggle="modal" data-bs-target="#modal{{ race.id }}">✎</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Add race -->
+<div class="card mb-4">
+  <div class="card-header">Add race manually</div>
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('admin.add_race') }}" class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label">Name</label>
+        <input type="text" name="name" class="form-control form-control-sm" placeholder="e.g. Australian Grand Prix" required>
+      </div>
+      <div class="col-md-1">
+        <label class="form-label">Round</label>
+        <input type="number" name="round_number" class="form-control form-control-sm" min="1" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Type</label>
+        <select name="race_type" class="form-select form-select-sm">
+          <option value="race">Race</option>
+          <option value="sprint">Sprint</option>
+        </select>
+      </div>
+      <div class="col-md-1">
+        <label class="form-label">Half</label>
+        <select name="season_half" class="form-select form-select-sm">
+          <option value="1">H1</option>
+          <option value="2">H2</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Date</label>
+        <input type="datetime-local" name="race_date" class="form-control form-control-sm">
+      </div>
+      <div class="col-md-1">
+        <button type="submit" class="btn btn-sm btn-danger w-100">Add</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Manual result modals -->
+{% for race in races %}
+<div class="modal fade" id="modal{{ race.id }}" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content" style="background:var(--surface);border-color:var(--border)">
+      <div class="modal-header" style="border-color:var(--border)">
+        <h6 class="modal-title" style="font-size:.9rem">{{ race.name }}</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('admin.set_result', race_id=race.id) }}">
+        <div class="modal-body">
+          {% for i in range(1, race.max_positions + 1) %}
+          <div class="mb-2">
+            <label class="form-label">P{{ i }}</label>
+            <input type="text" name="pos{{ i }}" class="form-control form-control-sm"
+                   value="{% if race.result %}{{ race.result['pos'~i] or '' }}{% endif %}"
+                   placeholder="Family name" required>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="modal-footer" style="border-color:var(--border)">
+          <button type="submit" class="btn btn-sm btn-danger w-100">Save result</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

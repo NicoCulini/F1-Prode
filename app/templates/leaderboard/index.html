@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard — F1 Prode{% endblock %}
+
+{% block content %}
+
+{# ── Top bar: mode + tab selectors ─────────────── #}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+  <h4 class="page-title mb-0">Leaderboard</h4>
+  <div class="d-flex gap-2 flex-wrap">
+    <div class="seg-control">
+      <a href="{{ url_for('leaderboard.index', mode='normal', tab=tab) }}"
+         class="seg-option {% if mode == 'normal' %}seg-active{% endif %}">Normal Season</a>
+      <a href="{{ url_for('leaderboard.index', mode='tapia', tab=tab) }}"
+         class="seg-option {% if mode == 'tapia' %}seg-active{% endif %}">Tapia Season</a>
+    </div>
+  </div>
+</div>
+
+{# Tab selector — underline style #}
+<div class="lb-tabs {% if mode == 'tapia' %}mb-0{% else %}mb-4{% endif %}">
+  {% for t, label in [('combined','Combined'), ('races','Races'), ('sprints','Sprints')] %}
+  <a href="{{ url_for('leaderboard.index', mode=mode, tab=t, half=half) }}"
+     class="lb-tab {% if tab == t %}lb-tab-active{% endif %}">
+    {{ label }}
+  </a>
+  {% endfor %}
+</div>
+
+{% if mode == 'tapia' %}
+<div class="lb-tabs mb-4" style="border-top:none;border-bottom:1px solid var(--border-subtle);margin-top:.75rem">
+  {% for h, label in [('overall','Overall'), ('h1','First Half'), ('h2','Second Half')] %}
+  <a href="{{ url_for('leaderboard.index', mode=mode, tab=tab, half=h) }}"
+     class="lb-tab {% if half == h %}lb-tab-active{% endif %}"
+     style="font-size:.78rem;padding:.4rem 1rem">
+    {{ label }}
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+
+{% if mode == 'normal' %}
+
+  {% set rows = data[tab] %}
+  {% if not rows %}
+    <div class="card text-center py-5" style="color:var(--text-3)">No completed {{ tab }} yet.</div>
+  {% else %}
+    {{ lb_table(rows, tab) }}
+  {% endif %}
+
+
+{% else %}{# tapia #}
+
+  {% if half == 'h1' %}
+    {% set rows = h1[tab] %}
+    {% if rows %}{{ lb_table(rows, tab) }}
+    {% else %}<div class="card text-center py-4" style="color:var(--text-3)">No First Half results yet.</div>{% endif %}
+
+  {% elif half == 'h2' %}
+    {% set rows = h2[tab] %}
+    {% if rows %}{{ lb_table(rows, tab) }}
+    {% else %}<div class="card text-center py-4" style="color:var(--text-3)">No Second Half results yet.</div>{% endif %}
+
+  {% else %}{# overall #}
+    {% if overall %}{{ tapia_overall(overall) }}
+    {% else %}<div class="card text-center py-4" style="color:var(--text-3)">No results yet.</div>{% endif %}
+  {% endif %}
+
+{% endif %}
+
+{% endblock %}
+
+
+{% macro lb_table(rows, tab, compact=false) %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th style="width:40px">#</th>
+          <th>Player</th>
+          {% if tab in ('combined', 'races') %}
+            <th class="text-center">P1</th>
+            <th class="text-center">P2</th>
+            <th class="text-center">P3</th>
+            <th class="text-center">P4</th>
+            <th class="text-center">P5</th>
+          {% elif tab == 'sprints' %}
+            <th class="text-center">P1</th>
+            <th class="text-center">P2</th>
+            <th class="text-center">P3</th>
+          {% endif %}
+          <th class="text-end">Pts</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr class="lb-row-{{ loop.index if loop.index <= 3 else '' }}">
+          <td>
+            {% if loop.index == 1 %}🥇
+            {% elif loop.index == 2 %}🥈
+            {% elif loop.index == 3 %}🥉
+            {% else %}<span style="color:var(--text-3)">{{ loop.index }}</span>{% endif %}
+          </td>
+          <td style="font-weight:600">
+            <a href="{{ url_for('predictions.user_predictions', user_id=row.user.id) }}" class="lb-user-link">
+              {{ row.user.username }}
+            </a>
+          </td>
+
+          {% if tab in ('combined', 'races') %}
+            {% for p in [1,2,3,4,5] %}
+            <td class="text-center">
+              {% set v = row.hits[p] %}
+              {% if v > 0 %}<span style="color:var(--accent);font-weight:700">{{ v }}</span>
+              {% else %}<span style="color:var(--text-3)">—</span>{% endif %}
+            </td>
+            {% endfor %}
+          {% elif tab == 'sprints' %}
+            {% for p in [1,2,3] %}
+            <td class="text-center">
+              {% set v = row.hits[p] %}
+              {% if v > 0 %}<span style="color:var(--accent);font-weight:700">{{ v }}</span>
+              {% else %}<span style="color:var(--text-3)">—</span>{% endif %}
+            </td>
+            {% endfor %}
+          {% endif %}
+
+          <td class="text-end lb-total">{{ row.total }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endmacro %}
+
+
+{% macro tapia_overall(overall) %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th style="width:40px">#</th>
+          <th>Player</th>
+          <th class="text-center">P1</th>
+          <th class="text-center">P2</th>
+          <th class="text-center">P3</th>
+          <th class="text-center">P4</th>
+          <th class="text-center">P5</th>
+          <th class="text-center">H1</th>
+          <th class="text-center">H2</th>
+          <th class="text-end">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in overall %}
+        <tr class="lb-row-{{ loop.index if loop.index <= 3 else '' }}">
+          <td>
+            {% if loop.index == 1 %}🥇
+            {% elif loop.index == 2 %}🥈
+            {% elif loop.index == 3 %}🥉
+            {% else %}<span style="color:var(--text-3)">{{ loop.index }}</span>{% endif %}
+          </td>
+          <td style="font-weight:600"><a href="{{ url_for('predictions.user_predictions', user_id=row.user_id) }}" class="lb-user-link">{{ row.username }}</a></td>
+          {% for p in [1,2,3,4,5] %}
+          <td class="text-center">
+            {% set v = row.hits[p] %}
+            {% if v > 0 %}<span style="color:var(--accent);font-weight:700">{{ v }}</span>
+            {% else %}<span style="color:var(--text-3)">—</span>{% endif %}
+          </td>
+          {% endfor %}
+          <td class="text-center" style="color:var(--text-2)">{{ row.h1 }}</td>
+          <td class="text-center" style="color:var(--text-2)">{{ row.h2 }}</td>
+          <td class="text-end lb-total">{{ row.total }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endmacro %}

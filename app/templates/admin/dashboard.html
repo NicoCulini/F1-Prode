@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Admin — F1 Prode{% endblock %}
+
+{% block content %}
+<h4 style="font-family:'Titillium Web',sans-serif;font-weight:700;margin-bottom:1.5rem">
+  Admin <span style="color:var(--yellow);font-size:.75rem;font-weight:600;vertical-align:middle;margin-left:.5rem">2026</span>
+</h4>
+
+<div class="row g-3 mb-4">
+  {% for label, val, color in [('Players', stats.users, 'var(--accent)'), ('Races', stats.races, 'var(--text)'), ('Completed', stats.completed, 'var(--green)'), ('Drivers', stats.drivers, '#58a6ff')] %}
+  <div class="col-6 col-md-3">
+    <div class="card">
+      <div class="stat-block">
+        <div class="stat-num" style="color:{{ color }}">{{ val }}</div>
+        <div class="stat-lbl">{{ label }}</div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="row g-3">
+  <div class="col-md-5">
+    <div class="card h-100">
+      <div class="card-header">Quick actions</div>
+      <div class="card-body d-grid gap-2">
+        <a href="{{ url_for('admin.races') }}" class="btn btn-outline-danger btn-sm">Manage races</a>
+        <a href="{{ url_for('admin.users') }}" class="btn btn-outline-secondary btn-sm">Manage users</a>
+        <a href="{{ url_for('admin.import_schedule') }}" class="btn btn-outline-secondary btn-sm">Import 2026 schedule</a>
+        <a href="{{ url_for('admin.import_drivers') }}" class="btn btn-outline-secondary btn-sm">Import 2026 drivers</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-7">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center"
+           style="cursor:pointer" data-bs-toggle="collapse" data-bs-target="#setup-guide">
+        Setup guide
+        <span style="font-size:.7rem;color:var(--text-3)">▾</span>
+      </div>
+      <div id="setup-guide" class="collapse">
+        <div class="card-body">
+          <ol style="color:var(--text-2);font-size:.875rem;line-height:2;margin:0;padding-left:1.25rem">
+            <li>Import 2026 schedule — loads all races + sprints with auto half-split.</li>
+            <li>Import 2026 drivers — needed for prediction dropdowns.</li>
+            <li>After each qualifying session, predictions open automatically once the API has data.</li>
+            <li>After each race, click <strong style="color:var(--text)">Fetch result</strong> to score everyone's predictions.</li>
+            <li>Use <strong style="color:var(--text)">Toggle predictions</strong> to manually open/close a race.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

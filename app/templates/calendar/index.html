@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Calendar — F1 Prode{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="page-title mb-0">2026 Calendar</h4>
+  <div class="seg-control">
+    <a href="{{ url_for('calendar.index', view='normal') }}"
+       class="seg-option {% if view == 'normal' %}seg-active{% endif %}">Normal Season</a>
+    <a href="{{ url_for('calendar.index', view='tapia') }}"
+       class="seg-option {% if view == 'tapia' %}seg-active{% endif %}">Tapia Season</a>
+  </div>
+</div>
+
+{% if not races %}
+<div class="card text-center py-5" style="color:var(--text-3)">
+  No races imported yet. Ask an admin to import the schedule.
+</div>
+{% else %}
+
+{% if view == 'tapia' %}
+  {# ── Tapia: grouped by half ─────────────────── #}
+  {% for half_num, half_label in [(1, 'First Half'), (2, 'Second Half')] %}
+    {% set half_races = races | selectattr('season_half', 'equalto', half_num) | list %}
+    {% if half_races %}
+    <p style="font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin:{% if half_num > 1 %}1.5rem{% else %}0{% endif %} 0 .6rem">
+      {{ half_label }}
+    </p>
+    {% for race in half_races %}
+      {{ race_row(race) }}
+    {% endfor %}
+    {% endif %}
+  {% endfor %}
+
+{% else %}
+  {# ── Normal: all races in order ──────────────── #}
+  {% for race in races %}
+    {{ race_row(race) }}
+  {% endfor %}
+{% endif %}
+
+{% endif %}
+{% endblock %}
+
+
+{% macro race_row(race) %}
+{% set is_past = race.race_date and race.race_date < now %}
+<div class="card mb-1 {% if is_past or race.is_completed %}cal-past{% endif %}">
+  <div class="card-body py-2 px-3">
+    <div class="row align-items-center g-2">
+      <div class="col-auto" style="width:44px">
+        <span style="font-size:.72rem;font-weight:700;color:var(--text-3)">R{{ race.round_number }}</span>
+      </div>
+      <div class="col-auto" style="width:72px;text-align:center">
+        <span class="badge-{{ race.race_type }}">{{ race.race_type }}</span>
+      </div>
+      <div class="col">
+        <span style="font-weight:600;font-size:.9rem">{{ race.name }}</span>
+      </div>
+      <div class="col-auto text-end">
+        {% if race.race_date %}
+          {% if race.is_completed %}
+            <span style="font-size:.78rem;color:var(--text-3)">{{ race.race_date.strftime('%d %b') }}</span>
+            <span style="font-size:.7rem;color:var(--accent);margin-left:.5rem">✓</span>
+          {% else %}
+            <span style="font-size:.85rem;font-weight:600;color:{% if is_past %}var(--text-3){% else %}var(--text-2){% endif %}">
+              {{ race.race_date.strftime('%d %b') }}
+            </span>
+          {% endif %}
+        {% else %}
+          <span style="font-size:.78rem;color:var(--text-3)">TBC</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endmacro %}

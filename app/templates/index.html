@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}F1 Prode{% endblock %}
+
+{% block content %}
+<div class="hero">
+  <div class="season-pill">2026 Season</div>
+  <h1 class="hero-title">F1 <span style="color:var(--accent)">Prode</span></h1>
+  <p style="color:var(--text-2);max-width:400px;margin:.5rem auto 2rem;font-size:.95rem">
+    Predict the top finishers after qualifying. Score points. Beat your friends.
+  </p>
+
+  {% if current_user.is_authenticated %}
+    {% if next_race %}
+      <div style="margin-bottom:.75rem">
+        <a href="{{ url_for('predictions.predict', race_id=next_race.id) }}"
+           class="btn btn-danger btn-lg px-5" style="font-size:1rem;letter-spacing:.04em">
+          Predict
+        </a>
+      </div>
+      <p style="font-size:.8rem;color:var(--text-3)">
+        {{ next_race.name }}
+        {% if next_race.race_date %}&mdash; {{ next_race.race_date.strftime('%d %b') }}{% endif %}
+      </p>
+    {% else %}
+      <p style="color:var(--text-3);font-size:.9rem">No upcoming races right now.</p>
+    {% endif %}
+  {% else %}
+    <div class="d-flex gap-2 justify-content-center">
+      <a href="{{ url_for('auth.register') }}" class="btn btn-danger px-4">Join now</a>
+      <a href="{{ url_for('auth.login') }}" class="btn btn-outline-secondary px-4">Sign in</a>
+    </div>
+  {% endif %}
+</div>
+
+{% if recent %}
+<div class="card">
+  <div class="card-header">Recent results</div>
+  {% for race in recent %}
+  {% set pred = user_preds.get(race.id) %}
+  {% set picks = [pred.pos1, pred.pos2, pred.pos3, pred.pos4, pred.pos5] if pred else [] %}
+  <div class="recent-row d-flex align-items-center justify-content-between px-4 py-3"
+       style="border-bottom:1px solid var(--border-subtle){% if loop.last %};border-bottom:none{% endif %}">
+    <div class="d-flex align-items-center gap-2">
+      <span class="badge-{{ race.race_type }}">{{ race.race_type }}</span>
+      <span style="font-weight:600;font-size:.875rem">{{ race.name }}</span>
+    </div>
+    {% if race.result %}
+    {% set res = [race.result.pos1, race.result.pos2, race.result.pos3,
+                  race.result.pos4, race.result.pos5] if race.race_type != 'sprint'
+                 else [race.result.pos1, race.result.pos2, race.result.pos3] %}
+    <div class="recent-drivers d-flex gap-2">
+      {% for name in res %}
+      {% if name %}
+      {% set hit = picks and loop.index0 < picks|length and picks[loop.index0] and picks[loop.index0].lower() == name.lower() %}
+      <span style="font-size:.78rem;color:{% if hit %}var(--green){% else %}var(--text-3){% endif %}">
+        {{ name }}
+      </span>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  <div class="px-4 py-3">
+    <a href="{{ url_for('leaderboard.index') }}" style="font-size:.82rem;color:var(--accent)">View leaderboard →</a>
+  </div>
+</div>
+{% endif %}
+
+<div class="card mt-3">
+  <div class="card-body py-4">
+    <p style="font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);text-align:center;margin-bottom:1.25rem">Scoring</p>
+    <div class="scoring-grid">
+      <div class="scoring-item"><div class="scoring-pts">5</div><div class="scoring-lbl">P1</div></div>
+      <div class="scoring-item"><div class="scoring-pts">4</div><div class="scoring-lbl">P2</div></div>
+      <div class="scoring-item"><div class="scoring-pts">3</div><div class="scoring-lbl">P3</div></div>
+      <div class="scoring-item"><div class="scoring-pts">2</div><div class="scoring-lbl">P4</div></div>
+      <div class="scoring-item"><div class="scoring-pts">1</div><div class="scoring-lbl">P5</div></div>
+    </div>
+    <p style="text-align:center;color:var(--text-3);font-size:.75rem;margin-top:1rem;margin-bottom:0">
+      Sprints: 3–2–1 &nbsp;·&nbsp; Predictions lock 4 hours before race start
+    </p>
+  </div>
+</div>
+{% endblock %}

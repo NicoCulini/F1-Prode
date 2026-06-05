@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Users — Admin{% endblock %}
+
+{% block content %}
+<h4 style="font-family:'Titillium Web',sans-serif;font-weight:700;margin-bottom:1.5rem">Users</h4>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Username</th>
+          <th>Joined</th>
+          <th class="text-center">Role</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+        <tr>
+          <td style="color:var(--text-muted);font-size:.82rem">{{ user.id }}</td>
+          <td style="font-weight:600">{{ user.username }}</td>
+          <td style="color:var(--text-secondary);font-size:.82rem">{{ user.created_at.strftime('%d %b %Y') }}</td>
+          <td class="text-center">
+            {% if user.is_admin %}
+            <span style="color:var(--yellow);font-size:.75rem;font-weight:700">admin</span>
+            {% else %}
+            <span style="color:var(--text-muted);font-size:.75rem">player</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <a href="{{ url_for('admin.toggle_admin', user_id=user.id) }}"
+               class="btn btn-xs btn-outline-secondary">
+              {{ 'Revoke admin' if user.is_admin else 'Make admin' }}
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

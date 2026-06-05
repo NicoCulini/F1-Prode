@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}{{ viewed_user.username if viewed_user else 'My' }} Predictions — F1 Prode{% endblock %}
+
+{% block content %}
+{% set total_score = user_preds.values() | sum(attribute='score') %}
+
+{% if viewed_user and viewed_user.id != current_user.id %}
+<a href="{{ url_for('leaderboard.index') }}" style="font-size:.85rem;color:var(--text-3);display:inline-block;margin-bottom:.75rem">
+  ← Leaderboard
+</a>
+{% endif %}
+
+<div class="d-flex justify-content-between align-items-baseline mb-4">
+  <h4 class="page-title mb-0">
+    {% if viewed_user and viewed_user.id != current_user.id %}
+      {{ viewed_user.username }}'s Predictions
+    {% else %}
+      My Predictions
+    {% endif %}
+  </h4>
+  <span style="font-family:'Titillium Web',sans-serif;font-weight:900;font-size:1.4rem;color:var(--accent);margin-right:1.5rem">
+    {{ total_score }} <span style="font-size:.75rem;font-weight:600;color:var(--text-3)">pts</span>
+  </span>
+</div>
+
+{% if not past_races %}
+<div class="card text-center py-5" style="color:var(--text-3);font-size:.9rem">
+  No completed races yet — scores will appear here.
+</div>
+{% else %}
+
+{# Pre-compute per race #}
+{% set race_data = [] %}
+{% for race in past_races %}
+  {% set pred = user_preds.get(race.id) %}
+  {% set result = results.get(race.id) %}
+  {% set picks = [pred.pos1, pred.pos2, pred.pos3, pred.pos4, pred.pos5] | select | list if pred else [] %}
+  {% if result %}
+    {% set res = [result.pos1, result.pos2, result.pos3] | select | list if race.race_type == 'sprint'
+                 else [result.pos1, result.pos2, result.pos3, result.pos4, result.pos5] | select | list %}
+  {% else %}
+    {% set res = [] %}
+  {% endif %}
+  {% set _ = race_data.append({'race': race, 'pred': pred, 'picks': picks, 'res': res}) %}
+{% endfor %}
+
+
+{# ── DESKTOP: table ──────────────────────────────── #}
+<div class="card d-none d-md-block">
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th style="width:28px"></th>
+          <th>Race</th>
+          <th class="text-center">Type</th>
+          <th>Picks</th>
+          <th>Result</th>
+          <th class="text-center">Score</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in race_data %}
+        {% set race=d.race %} {% set pred=d.pred %} {% set picks=d.picks %} {% set res=d.res %}
+        {% set has_extra = picks|length > 2 or res|length > 2 %}
+        <tr class="pred-row" data-rid="{{ race.id }}">
+          <td style="width:28px;vertical-align:middle">
+            {% if has_extra %}
+            <button class="expand-btn" data-rid="{{ race.id }}" style="padding:0;width:100%;text-align:center">
+              <span class="expand-label">▾</span>
+            </button>
+            {% endif %}
+          </td>
+          <td>
+            <span style="font-weight:600;font-size:.875rem">{{ race.name }}</span>
+            {% if race.race_date %}<br><span style="font-size:.72rem;color:var(--text-3)">{{ race.race_date.strftime('%d %b') }}</span>{% endif %}
+          </td>
+          <td class="text-center"><span class="badge-{{ race.race_type }}">{{ race.race_type }}</span></td>
+          <td>
+            {% if picks %}{% for name in picks %}
+              {% set hit = res and loop.index0 < res|length and name and res[loop.index0] and name.lower()==res[loop.index0].lower() %}
+              <div class="pick-line{% if loop.index>2 %} pick-extra{% endif %}"{% if loop.index>2 %} data-rid="{{ race.id }}" style="display:none"{% endif %}>
+                <span class="pick-num">{{ loop.index }}</span>
+                <span style="color:{% if hit %}var(--green){% else %}var(--text-2){% endif %}">{{ name }}</span>
+              </div>
+            {% endfor %}{% else %}<span style="color:var(--text-3)">—</span>{% endif %}
+          </td>
+          <td>
+            {% if res %}{% for name in res %}
+              {% set hit = picks and loop.index0 < picks|length and picks[loop.index0] and name and picks[loop.index0].lower()==name.lower() %}
+              <div class="pick-line{% if loop.index>2 %} pick-extra{% endif %}"{% if loop.index>2 %} data-rid="{{ race.id }}" style="display:none"{% endif %}>
+                <span class="pick-num">{{ loop.index }}</span>
+                <span style="color:{% if hit %}var(--green){% else %}var(--text-2){% endif %}">{{ name }}</span>
+              </div>
+            {% endfor %}{% else %}<span style="color:var(--text-3)">—</span>{% endif %}
+          </td>
+          <td class="text-center">
+            {% if pred %}<span class="score-pill {% if pred.score>0 %}score-pill-pos{% else %}score-pill-zero{% endif %}">{{ pred.score }} pts</span>
+            {% else %}<span style="color:var(--text-3);font-size:.8rem">—</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+{# ── MOBILE: cards ───────────────────────────────── #}
+<div class="d-md-none">
+  {% for d in race_data %}
+  {% set race=d.race %} {% set pred=d.pred %} {% set picks=d.picks %} {% set res=d.res %}
+  {% set has_extra = picks|length > 2 or res|length > 2 %}
+
+  <div class="card mb-2 pred-row" data-rid="m{{ race.id }}" {% if has_extra %}style="cursor:pointer"{% endif %}>
+    <div class="card-body p-3">
+
+      {# Header #}
+      <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge-{{ race.race_type }}">{{ race.race_type }}</span>
+            {% if race.race_date %}<span style="font-size:.72rem;color:var(--text-3)">{{ race.race_date.strftime('%d %b') }}</span>{% endif %}
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <span style="font-weight:600;font-size:.9rem">{{ race.name }}</span>
+            {% if has_extra %}
+            <button class="expand-btn" data-rid="m{{ race.id }}" style="font-size:.9rem;padding:0;line-height:1">
+              <span class="expand-label">▾</span>
+            </button>
+            {% endif %}
+          </div>
+        </div>
+        {% if pred %}<span class="score-pill {% if pred.score>0 %}score-pill-pos{% else %}score-pill-zero{% endif %}">{{ pred.score }} pts</span>
+        {% else %}<span style="color:var(--text-3);font-size:.8rem">—</span>{% endif %}
+      </div>
+
+      {# Picks + Results #}
+      <div class="row g-3">
+        <div class="col-6">
+          <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:.4rem">Picks</div>
+          {% if picks %}{% for name in picks %}
+            {% set hit = res and loop.index0 < res|length and name and res[loop.index0] and name.lower()==res[loop.index0].lower() %}
+            <div class="pick-line{% if loop.index>2 %} pick-extra{% endif %}"{% if loop.index>2 %} data-rid="m{{ race.id }}" style="display:none"{% endif %}>
+              <span class="pick-num">{{ loop.index }}</span>
+              <span style="color:{% if hit %}var(--green){% else %}var(--text-2){% endif %}">{{ name }}</span>
+            </div>
+          {% endfor %}{% else %}<span style="color:var(--text-3);font-size:.8rem">—</span>{% endif %}
+        </div>
+        <div class="col-6">
+          <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:.4rem">Result</div>
+          {% if res %}{% for name in res %}
+            {% set hit = picks and loop.index0 < picks|length and picks[loop.index0] and name and picks[loop.index0].lower()==name.lower() %}
+            <div class="pick-line{% if loop.index>2 %} pick-extra{% endif %}"{% if loop.index>2 %} data-rid="m{{ race.id }}" style="display:none"{% endif %}>
+              <span class="pick-num">{{ loop.index }}</span>
+              <span style="color:{% if hit %}var(--green){% else %}var(--text-2){% endif %}">{{ name }}</span>
+            </div>
+          {% endfor %}{% else %}<span style="color:var(--text-3);font-size:.8rem">—</span>{% endif %}
+        </div>
+      </div>
+
+
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleRow(rid) {
+  const btn = document.querySelector(`.expand-btn[data-rid="${rid}"]`);
+  if (!btn) return;
+  const extras = document.querySelectorAll(`.pick-extra[data-rid="${rid}"]`);
+  const expanded = btn.classList.toggle('expanded');
+  extras.forEach(el => el.style.display = expanded ? 'flex' : 'none');
+  btn.querySelector('.expand-label').textContent = expanded ? '▴' : '▾';
+}
+
+document.querySelectorAll('.pred-row').forEach(row => {
+  const rid = row.dataset.rid;
+  if (!document.querySelector(`.expand-btn[data-rid="${rid}"]`)) return;
+  row.addEventListener('click', () => toggleRow(rid));
+});
+</script>
+{% endblock %}

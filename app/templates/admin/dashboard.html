@@ -53,6 +53,39 @@
   </div>
 </div>
 
+{% if next_race %}
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Predictions — {{ next_race.name }} <span class="badge-{{ next_race.race_type }}" style="margin-left:.4rem">{{ next_race.race_type }}</span></span>
+        <span style="font-size:.75rem;color:var(--text-3)">
+          {{ submission_status | selectattr('submitted') | list | length }}/{{ submission_status | length }} submitted
+        </span>
+      </div>
+      <div class="table-responsive">
+        <table class="table mb-0 align-middle">
+          <tbody>
+            {% for s in submission_status %}
+            <tr>
+              <td style="font-weight:600">{{ s.user.username }}</td>
+              <td class="text-end">
+                {% if s.submitted %}
+                  <span style="color:var(--green);font-size:.8rem;font-weight:700">✓ Submitted</span>
+                {% else %}
+                  <span style="color:var(--text-3);font-size:.8rem">✗ Not yet</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="row g-3 mt-1">
   <div class="col-12">
     <div class="card">

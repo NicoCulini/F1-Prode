@@ -23,6 +23,7 @@ def admin_required(f):
 @admin_bp.route('/')
 @admin_required
 def dashboard():
+    from datetime import datetime
     stats = {
         'users': User.query.count(),
         'races': Race.query.filter_by(season=Config.CURRENT_SEASON).count(),
@@ -31,7 +32,25 @@ def dashboard():
     }
     show_overall = Setting.get('show_overall') == 'true'
     users = User.query.order_by(User.username).all()
-    return render_template('admin/dashboard.html', stats=stats, show_overall=show_overall, users=users)
+
+    # Next upcoming race with predictions closed or still open
+    next_race = (Race.query
+                 .filter_by(season=Config.CURRENT_SEASON, is_completed=False)
+                 .order_by(Race.race_date)
+                 .first())
+    if next_race:
+        submitted_ids = {p.user_id for p in Prediction.query.filter_by(race_id=next_race.id).all()}
+        submission_status = [
+            {'user': u, 'submitted': u.id in submitted_ids}
+            for u in users
+        ]
+    else:
+        submission_status = []
+
+    return render_template('admin/dashboard.html',
+                           stats=stats, show_overall=show_overall,
+                           users=users, next_race=next_race,
+                           submission_status=submission_status)
 
 
 @admin_bp.route('/toggle-overall')

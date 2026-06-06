@@ -17,12 +17,16 @@ def _is_locked(race):
 
 
 def _visible_races():
-    """Completed races + any locked upcoming race (predictions closed but not done yet)."""
-    all_races = (Race.query
-                 .filter_by(season=Config.CURRENT_SEASON)
+    """Completed races + the single next upcoming race (always shown)."""
+    completed = (Race.query
+                 .filter_by(season=Config.CURRENT_SEASON, is_completed=True)
                  .order_by(Race.race_date.desc())
                  .all())
-    return [r for r in all_races if r.is_completed or not r.predictions_open]
+    next_race = (Race.query
+                 .filter_by(season=Config.CURRENT_SEASON, is_completed=False)
+                 .order_by(Race.race_date)
+                 .first())
+    return ([next_race] if next_race else []) + completed
 
 
 @predictions_bp.route('/')

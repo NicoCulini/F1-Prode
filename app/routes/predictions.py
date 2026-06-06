@@ -16,18 +16,23 @@ def _is_locked(race):
     return datetime.utcnow() >= race.race_date - timedelta(hours=4)
 
 
+def _visible_races():
+    """Completed races + any locked upcoming race (predictions closed but not done yet)."""
+    all_races = (Race.query
+                 .filter_by(season=Config.CURRENT_SEASON)
+                 .order_by(Race.race_date.desc())
+                 .all())
+    return [r for r in all_races if r.is_completed or not r.predictions_open]
+
+
 @predictions_bp.route('/')
 @login_required
 def index():
-    """History of past races and scores — no API calls, instant load."""
-    past_races = (Race.query
-                  .filter_by(season=Config.CURRENT_SEASON, is_completed=True)
-                  .order_by(Race.race_date.desc())
-                  .all())
+    races = _visible_races()
     user_preds = {p.race_id: p for p in Prediction.query.filter_by(user_id=current_user.id).all()}
     results = {r.race_id: r for r in RaceResult.query.all()}
     return render_template('predictions/index.html',
-                           past_races=past_races,
+                           past_races=races,
                            user_preds=user_preds,
                            results=results,
                            my_preds=None)
@@ -38,16 +43,13 @@ def index():
 def user_predictions(user_id):
     from app.models import User
     viewed_user = User.query.get_or_404(user_id)
-    past_races = (Race.query
-                  .filter_by(season=Config.CURRENT_SEASON, is_completed=True)
-                  .order_by(Race.race_date.desc())
-                  .all())
+    races = _visible_races()
     user_preds = {p.race_id: p for p in Prediction.query.filter_by(user_id=user_id).all()}
     results = {r.race_id: r for r in RaceResult.query.all()}
-    # Race IDs where the *viewing* user has already submitted — used to gate pick visibility
+    # Race IDs where the *viewing* user has submitted — gates upcoming race picks
     my_preds = {p.race_id for p in Prediction.query.filter_by(user_id=current_user.id).all()}
     return render_template('predictions/index.html',
-                           past_races=past_races,
+                           past_races=races,
                            user_preds=user_preds,
                            results=results,
                            viewed_user=viewed_user,

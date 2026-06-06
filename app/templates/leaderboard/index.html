@@ -4,9 +4,9 @@
 {% block content %}
 
 {# ── Top bar: mode + tab selectors ─────────────── #}
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+<div class="d-flex justify-content-between align-items-center gap-2 mb-4">
   <h4 class="page-title mb-0">Leaderboard</h4>
-  <div class="d-flex gap-2 flex-wrap">
+  <div class="d-flex gap-2">
     <div class="seg-control">
       <a href="{{ url_for('leaderboard.index', mode='normal', tab=tab) }}"
          class="seg-option {% if mode == 'normal' %}seg-active{% endif %}">Normal Season</a>

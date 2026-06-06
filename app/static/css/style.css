@@ -235,10 +235,9 @@ a:hover { color: #ff3330; }
   /* Tables */
   .table th, .table td { padding: .4rem .6rem; font-size: .78rem; }
 
-  /* Shrink page title + seg-control so they fit side by side */
-  .page-title { font-size: 1.1rem; }
+  /* Shrink seg-control so it fits next to the page title */
   .seg-control { padding: 2px; }
-  .seg-option { padding: .18rem .5rem; font-size: .7rem; }
+  .seg-option { padding: .15rem .45rem; font-size: .65rem; }
 }
 
 /* ── Bootstrap dark overrides ───────────────────── */

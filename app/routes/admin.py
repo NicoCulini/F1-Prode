@@ -30,7 +30,8 @@ def dashboard():
         'drivers': Driver.query.filter_by(season=Config.CURRENT_SEASON).count(),
     }
     show_overall = Setting.get('show_overall') == 'true'
-    return render_template('admin/dashboard.html', stats=stats, show_overall=show_overall)
+    users = User.query.order_by(User.username).all()
+    return render_template('admin/dashboard.html', stats=stats, show_overall=show_overall, users=users)
 
 
 @admin_bp.route('/toggle-overall')

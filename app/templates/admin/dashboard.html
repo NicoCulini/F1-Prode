@@ -52,5 +52,50 @@
     </div>
   </div>
 </div>
+
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">Players</div>
+      <div class="table-responsive">
+        <table class="table mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Joined</th>
+              <th class="text-center">Role</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for user in users %}
+            <tr>
+              <td style="font-weight:600">{{ user.username }}</td>
+              <td style="color:var(--text-2);font-size:.82rem">{{ user.created_at.strftime('%d %b %Y') }}</td>
+              <td class="text-center">
+                {% if user.is_admin %}
+                <span style="color:var(--yellow);font-size:.75rem;font-weight:700">admin</span>
+                {% else %}
+                <span style="color:var(--text-3);font-size:.75rem">player</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                {% if user.id != current_user.id %}
+                <a href="{{ url_for('admin.toggle_admin', user_id=user.id) }}"
+                   class="btn btn-xs {% if user.is_admin %}btn-outline-warning{% else %}btn-outline-secondary{% endif %}">
+                  {{ 'Revoke admin' if user.is_admin else 'Make admin' }}
+                </a>
+                {% else %}
+                <span style="color:var(--text-3);font-size:.75rem">you</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 

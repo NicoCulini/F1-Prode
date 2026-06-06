@@ -29,7 +29,8 @@ def index():
     return render_template('predictions/index.html',
                            past_races=past_races,
                            user_preds=user_preds,
-                           results=results)
+                           results=results,
+                           my_preds=None)
 
 
 @predictions_bp.route('/user/<int:user_id>')
@@ -43,11 +44,14 @@ def user_predictions(user_id):
                   .all())
     user_preds = {p.race_id: p for p in Prediction.query.filter_by(user_id=user_id).all()}
     results = {r.race_id: r for r in RaceResult.query.all()}
+    # Race IDs where the *viewing* user has already submitted — used to gate pick visibility
+    my_preds = {p.race_id for p in Prediction.query.filter_by(user_id=current_user.id).all()}
     return render_template('predictions/index.html',
                            past_races=past_races,
                            user_preds=user_preds,
                            results=results,
-                           viewed_user=viewed_user)
+                           viewed_user=viewed_user,
+                           my_preds=my_preds)
 
 
 @predictions_bp.route('/race/<int:race_id>', methods=['GET', 'POST'])

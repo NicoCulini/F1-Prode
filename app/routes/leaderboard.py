@@ -30,7 +30,9 @@ def _build(season_half=None, race_type=None):
     users = User.query.order_by(User.username).all()
     rows = []
     for user in users:
-        total = 0
+        total        = 0
+        race_total   = 0
+        sprint_total = 0
         hits = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
         for race in races:
             pred   = Prediction.query.filter_by(user_id=user.id, race_id=race.id).first()
@@ -42,8 +44,14 @@ def _build(season_half=None, race_type=None):
             for i in range(race.max_positions):
                 if plist[i] and rlist[i] and plist[i].lower() == rlist[i].lower():
                     hits[i + 1] += 1
-                    total += race.position_points[i]
+                    pts = race.position_points[i]
+                    total += pts
+                    if race.race_type == 'sprint':
+                        sprint_total += pts
+                    else:
+                        race_total += pts
         rows.append({'user': user, 'total': total, 'hits': hits,
+                     'race_total': race_total, 'sprint_total': sprint_total,
                      'total_hits': sum(hits.values())})
 
     rows.sort(key=lambda x: (-x['total'], x['user'].username))

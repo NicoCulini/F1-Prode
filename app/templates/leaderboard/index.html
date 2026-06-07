@@ -127,7 +127,13 @@
             {% endfor %}
           {% endif %}
 
-          <td class="text-end lb-total">{{ row.total }}</td>
+          <td class="text-end lb-total">
+            {% if tab == 'combined' and row.sprint_total %}
+              {{ row.race_total }}<span style="font-size:.6em;color:var(--purple);font-weight:700;vertical-align:super;margin-left:2px">{{ row.sprint_total }}</span>
+            {% else %}
+              {{ row.total }}
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>

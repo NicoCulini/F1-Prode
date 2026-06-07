@@ -116,7 +116,7 @@
                 {% set rv = row.race_hits[p] %}
                 {% set sv = row.sprint_hits[p] %}
                 {% if rv > 0 or sv > 0 %}
-                  <span style="color:var(--accent);font-weight:700">{{ rv if rv > 0 else '—' }}</span>{% if sv > 0 %}<span style="font-size:.6em;color:var(--purple);font-weight:700;vertical-align:super;margin-left:1px">{{ sv }}</span>{% endif %}
+                  <span style="white-space:nowrap"><span style="color:var(--accent);font-weight:700">{{ rv if rv > 0 else '—' }}</span>{% if sv > 0 %}<span style="font-size:.6em;color:var(--purple);font-weight:700;vertical-align:super;margin-left:1px">{{ sv }}</span>{% endif %}</span>
                 {% else %}
                   <span style="color:var(--text-3)">—</span>
                 {% endif %}

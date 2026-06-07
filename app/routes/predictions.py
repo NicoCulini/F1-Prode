@@ -73,10 +73,9 @@ def predict(race_id):
         flash('Predictions are locked — less than 4 hours to race start.', 'warning')
         return redirect(url_for('main.index'))
 
-    # Races: auto-unlock after qualifying appears in the API
-    # Sprints: admin controls open/close; shootout results shown in sidebar if available
+    # Both races and sprints auto-unlock once qualifying/shootout data appears in OpenF1
     qualifying = fetch_qualifying_top10(race)
-    if race.race_type == 'race' and not qualifying:
+    if not qualifying:
         flash('Qualifying hasn\'t happened yet — check back after qualifying.', 'warning')
         return redirect(url_for('main.index'))
 

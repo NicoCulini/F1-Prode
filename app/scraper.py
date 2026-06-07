@@ -37,13 +37,18 @@ def _race_meetings(season):
     )
 
 
-def _session_key(season, round_number, session_type):
-    """Return the session_key for a given round number + session type, or None."""
+def _session_key(season, round_number, session_type, session_name=None):
+    """Return the session_key for a given round number + session type, or None.
+    Pass session_name to disambiguate when multiple sessions share a type
+    (e.g. 'Qualifying' vs 'Sprint Qualifying' both have session_type='Qualifying').
+    """
     meetings = _race_meetings(season)
     if round_number < 1 or round_number > len(meetings):
         return None
     meeting_key = meetings[round_number - 1]['meeting_key']
     sessions = _get('sessions', meeting_key=meeting_key, session_type=session_type)
+    if session_name:
+        sessions = [s for s in sessions if s.get('session_name') == session_name]
     return sessions[0]['session_key'] if sessions else None
 
 
@@ -64,9 +69,13 @@ def _final_positions(session_key):
 # ── Public functions ─────────────────────────────────────────────────────────
 
 def fetch_qualifying_top10(race):
-    """Return up to 10 dicts {pos, name, given, code, team} from qualifying."""
+    """Return up to 10 dicts {pos, name, given, code, team} from qualifying.
+    For sprint races uses Sprint Qualifying (shootout); for main races uses Qualifying.
+    """
     try:
-        sk = _session_key(race.season, race.round_number, 'Qualifying')
+        session_name = 'Sprint Qualifying' if race.race_type == 'sprint' else 'Qualifying'
+        sk = _session_key(race.season, race.round_number, 'Qualifying',
+                          session_name=session_name)
         if not sk:
             return []
 

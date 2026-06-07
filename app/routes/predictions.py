@@ -73,15 +73,12 @@ def predict(race_id):
         flash('Predictions are locked — less than 4 hours to race start.', 'warning')
         return redirect(url_for('main.index'))
 
-    # Sprints: admin controls open/close manually (no API qualifying data available for shootout)
-    # Races: auto-unlock after main qualifying appears in the API
-    if race.race_type == 'race':
-        qualifying = fetch_qualifying_top10(race)
-        if not qualifying:
-            flash('Qualifying hasn\'t happened yet — check back after qualifying.', 'warning')
-            return redirect(url_for('main.index'))
-    else:
-        qualifying = []  # no shootout data available via API
+    # Races: auto-unlock after qualifying appears in the API
+    # Sprints: admin controls open/close; shootout results shown in sidebar if available
+    qualifying = fetch_qualifying_top10(race)
+    if race.race_type == 'race' and not qualifying:
+        flash('Qualifying hasn\'t happened yet — check back after qualifying.', 'warning')
+        return redirect(url_for('main.index'))
 
     drivers = (Driver.query
                .filter_by(season=Config.CURRENT_SEASON)

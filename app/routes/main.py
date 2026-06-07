@@ -11,7 +11,7 @@ def get_next_race():
     now = datetime.utcnow()
     return (Race.query
             .filter_by(season=Config.CURRENT_SEASON, is_completed=False, predictions_open=True)
-            .filter(Race.race_date >= now - timedelta(hours=4))  # still show up to 4h before race
+            .filter(Race.race_date >= now - timedelta(hours=2))  # still show up to 2h before race
             .order_by(Race.race_date)
             .first())
 

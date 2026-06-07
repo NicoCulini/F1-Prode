@@ -10,10 +10,10 @@ predictions_bp = Blueprint('predictions', __name__)
 
 
 def _is_locked(race):
-    """Predictions lock 4 hours before race start."""
+    """Predictions lock 2 hours before race start."""
     if not race.race_date:
         return False
-    return datetime.utcnow() >= race.race_date - timedelta(hours=4)
+    return datetime.utcnow() >= race.race_date - timedelta(hours=2)
 
 
 def _visible_races():

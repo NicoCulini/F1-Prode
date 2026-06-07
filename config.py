@@ -4,7 +4,6 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'f1-prode-dev-key-change-in-production')
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'sqlite:///f1prode.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    F1_API_BASE = 'https://api.jolpi.ca/ergast/f1'
     CURRENT_SEASON = 2026
 
 

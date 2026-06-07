@@ -29,10 +29,15 @@ def index():
               .all())
 
     user_preds = {}
+    already_predicted = False
     if current_user.is_authenticated:
         ids = [r.id for r in recent]
         user_preds = {p.race_id: p for p in
                       Prediction.query.filter(Prediction.user_id == current_user.id,
                                               Prediction.race_id.in_(ids)).all()}
+        if next_race:
+            already_predicted = Prediction.query.filter_by(
+                user_id=current_user.id, race_id=next_race.id).first() is not None
 
-    return render_template('index.html', next_race=next_race, recent=recent, user_preds=user_preds)
+    return render_template('index.html', next_race=next_race, recent=recent,
+                           user_preds=user_preds, already_predicted=already_predicted)

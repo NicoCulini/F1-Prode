@@ -14,7 +14,7 @@
       <div style="margin-bottom:.75rem">
         <a href="{{ url_for('predictions.predict', race_id=next_race.id) }}"
            class="btn btn-danger btn-lg px-5" style="font-size:1rem;letter-spacing:.04em">
-          Predict
+          {{ 'Update prediction' if already_predicted else 'Predict' }}
         </a>
       </div>
       <p style="font-size:.8rem;color:var(--text-3)">

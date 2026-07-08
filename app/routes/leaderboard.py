@@ -1,4 +1,5 @@
 from datetime import datetime
+# pyrefly: ignore [missing-import]
 from flask import Blueprint, render_template, request
 from app.models import User, Race, Prediction, RaceResult, Setting
 from config import Config
@@ -83,6 +84,7 @@ def index():
     mode = request.args.get('mode', 'tapia')
     tab  = request.args.get('tab',  'combined')
     half = request.args.get('half', _current_half())
+    history_races, history_lider = leaderPerWeek()
 
     if mode == 'normal':
         data = {
@@ -91,7 +93,8 @@ def index():
             'sprints':  _build(race_type='sprint'),
         }
         return render_template('leaderboard/index.html',
-                               mode='normal', tab=tab, half='overall', data=data)
+                               mode='normal', tab=tab, half='overall', data=data,
+                               history_races=history_races, history_lider=history_lider)
     else:
         h1 = {'combined': _build(1), 'races': _build(1, 'race'), 'sprints': _build(1, 'sprint')}
         h2 = {'combined': _build(2), 'races': _build(2, 'race'), 'sprints': _build(2, 'sprint')}
@@ -103,4 +106,45 @@ def index():
         return render_template('leaderboard/index.html',
                                mode='tapia', tab=tab, half=half,
                                h1=h1, h2=h2, overall=overall,
-                               show_overall=show_overall)
+                               show_overall=show_overall, history_races=history_races, history_lider=history_lider)
+
+def leaderPerWeek():
+    races = Race.query.filter_by(season=Config.CURRENT_SEASON, is_completed=True).order_by(Race.race_date).all()
+    users = User.query.order_by(User.username).all()
+    
+    predictions = Prediction.query.join(Race).filter(Race.season == Config.CURRENT_SEASON, Race.is_completed == True).all()
+    results = RaceResult.query.join(Race).filter(Race.season == Config.CURRENT_SEASON, Race.is_completed == True).all()
+    
+    pred_map = {(p.race_id, p.user_id): p for p in predictions}
+    res_map = {r.race_id: r for r in results}
+    
+    anotador = {user.id: 0 for user in users}
+    lider = {}
+
+    if not users:
+        return races, lider
+
+    for race in races:
+        result = res_map.get(race.id)
+        if not result:
+            # If no result, leader remains the same as previous race, but let's re-assign anyway
+            lider_id = max(anotador, key=anotador.get) if anotador else None
+            if lider_id:
+                lider[race.id] = next((u for u in users if u.id == lider_id), None)
+            continue
+            
+        rlist = [result.pos1, result.pos2, result.pos3, result.pos4, result.pos5]
+        
+        for user in users:
+            pred = pred_map.get((race.id, user.id))
+            if pred:
+                plist = [pred.pos1, pred.pos2, pred.pos3, pred.pos4, pred.pos5]
+                for i in range(race.max_positions):
+                    if plist[i] and rlist[i] and plist[i].lower() == rlist[i].lower():
+                        anotador[user.id] += race.position_points[i]
+                        
+        if anotador:
+            lider_id = max(anotador, key=anotador.get)
+            lider[race.id] = next((u for u in users if u.id == lider_id), None)
+
+    return races, lider

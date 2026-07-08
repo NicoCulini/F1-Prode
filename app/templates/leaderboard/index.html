@@ -9,9 +9,9 @@
   <div class="d-flex gap-2">
     <div class="seg-control">
       <a href="{{ url_for('leaderboard.index', mode='normal', tab=tab) }}"
-         class="seg-option {% if mode == 'normal' %}seg-active{% endif %}">Normal Season</a>
+        class="seg-option {% if mode == 'normal' %}seg-active{% endif %}">Normal Season</a>
       <a href="{{ url_for('leaderboard.index', mode='tapia', tab=tab) }}"
-         class="seg-option {% if mode == 'tapia' %}seg-active{% endif %}">Tapia Season</a>
+        class="seg-option {% if mode == 'tapia' %}seg-active{% endif %}">Tapia Season</a>
     </div>
   </div>
 </div>
@@ -20,7 +20,7 @@
 <div class="lb-tabs {% if mode == 'tapia' %}mb-0{% else %}mb-4{% endif %}">
   {% for t, label in [('combined','Combined'), ('races','Races'), ('sprints','Sprints')] %}
   <a href="{{ url_for('leaderboard.index', mode=mode, tab=t, half=half) }}"
-     class="lb-tab {% if tab == t %}lb-tab-active{% endif %}">
+    class="lb-tab {% if tab == t %}lb-tab-active{% endif %}">
     {{ label }}
   </a>
   {% endfor %}
@@ -28,11 +28,11 @@
 
 {% if mode == 'tapia' %}
 <div class="lb-tabs mb-4" style="border-top:none;border-bottom:1px solid var(--border-subtle);margin-top:.75rem">
-  {% set halves = [('overall','Overall'), ('h1','First Half'), ('h2','Second Half')] if show_overall else [('h1','First Half'), ('h2','Second Half')] %}
+  {% set halves = [('overall','Overall'), ('h1','First Half'), ('h2','Second Half')] if show_overall else [('h1','First
+  Half'), ('h2','Second Half')] %}
   {% for h, label in halves %}
   <a href="{{ url_for('leaderboard.index', mode=mode, tab=tab, half=h) }}"
-     class="lb-tab {% if half == h %}lb-tab-active{% endif %}"
-     style="font-size:.78rem;padding:.4rem 1rem">
+    class="lb-tab {% if half == h %}lb-tab-active{% endif %}" style="font-size:.78rem;padding:.4rem 1rem">
     {{ label }}
   </a>
   {% endfor %}
@@ -42,32 +42,55 @@
 
 {% if mode == 'normal' %}
 
-  {% set rows = data[tab] %}
-  {% if not rows %}
-    <div class="card text-center py-5" style="color:var(--text-3)">No completed {{ tab }} yet.</div>
-  {% else %}
-    {{ lb_table(rows, tab) }}
-  {% endif %}
+{% set rows = data[tab] %}
+{% if not rows %}
+<div class="card text-center py-5" style="color:var(--text-3)">No completed {{ tab }} yet.</div>
+{% else %}
+{{ lb_table(rows, tab) }}
+{% endif %}
 
 
 {% else %}{# tapia #}
 
-  {% if half == 'h1' %}
-    {% set rows = h1[tab] %}
-    {% if rows %}{{ lb_table(rows, tab) }}
-    {% else %}<div class="card text-center py-4" style="color:var(--text-3)">No First Half results yet.</div>{% endif %}
+{% if half == 'h1' %}
+{% set rows = h1[tab] %}
+{% if rows %}{{ lb_table(rows, tab) }}
+{% else %}<div class="card text-center py-4" style="color:var(--text-3)">No First Half results yet.</div>{% endif %}
 
-  {% elif half == 'h2' %}
-    {% set rows = h2[tab] %}
-    {% if rows %}{{ lb_table(rows, tab) }}
-    {% else %}<div class="card text-center py-4" style="color:var(--text-3)">No Second Half results yet.</div>{% endif %}
+{% elif half == 'h2' %}
+{% set rows = h2[tab] %}
+{% if rows %}{{ lb_table(rows, tab) }}
+{% else %}<div class="card text-center py-4" style="color:var(--text-3)">No Second Half results yet.</div>{% endif %}
 
-  {% else %}{# overall #}
-    {% if overall %}{{ tapia_overall(overall) }}
-    {% else %}<div class="card text-center py-4" style="color:var(--text-3)">No results yet.</div>{% endif %}
-  {% endif %}
+{% else %}{# overall #}
+{% if overall %}{{ tapia_overall(overall) }}
+{% else %}<div class="card text-center py-4" style="color:var(--text-3)">No results yet.</div>{% endif %}
+{% endif %}
 
 {% endif %}
+
+<hr class="mt-5 mb-4"> <!-- Una línea separadora -->
+<h3 class="text-center mb-4">Evolución del Campeonato</h3>
+<div class="grilla-lideres" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
+  {% for race in history_races %}
+  {% set ganador = history_lider[race.id] %}
+
+  <div class="tarjeta-lider" style="text-align: center; width: 110px;">
+    <!-- Avatar del líder en formato cuadrado -->
+    <img src="{{ url_for('static', filename='img/users/' ~ ganador.username|lower ~ '.png') }}"
+      alt="{{ ganador.username }}"
+      style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px; border: 3px solid var(--accent, #ffd700); box-shadow: 0 4px 8px rgba(0,0,0,0.2);"
+      onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'><rect width=\'100\' height=\'100\' rx=\'8\' fill=\'%23e0e0e0\'/><circle cx=\'50\' cy=\'40\' r=\'20\' fill=\'%23a0a0a0\'/><path d=\'M 20 100 Q 50 60 80 100\' stroke=\'%23a0a0a0\' stroke-width=\'10\' fill=\'none\' stroke-linecap=\'round\'/></svg>'; this.style.border='3px solid var(--border-subtle, #ccc)';">
+
+    <div style="font-weight: 700; font-size: 1.1rem; margin-top: 6px; line-height: 1.2;">
+      {{ ganador.username }}
+    </div>
+    <div style="font-size: 0.9rem; margin-top: 2px; color: var(--text-2, #666);">
+      2026 | R{{ race.round_number }}{% if race.race_type == 'sprint' %} S{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
 
 {% endblock %}
 
@@ -81,15 +104,15 @@
           <th style="width:40px">#</th>
           <th>Player</th>
           {% if tab in ('combined', 'races') %}
-            <th class="text-center">P1</th>
-            <th class="text-center">P2</th>
-            <th class="text-center">P3</th>
-            <th class="text-center">P4</th>
-            <th class="text-center">P5</th>
+          <th class="text-center">P1</th>
+          <th class="text-center">P2</th>
+          <th class="text-center">P3</th>
+          <th class="text-center">P4</th>
+          <th class="text-center">P5</th>
           {% elif tab == 'sprints' %}
-            <th class="text-center">P1</th>
-            <th class="text-center">P2</th>
-            <th class="text-center">P3</th>
+          <th class="text-center">P1</th>
+          <th class="text-center">P2</th>
+          <th class="text-center">P3</th>
           {% endif %}
           <th class="text-end">Pts</th>
         </tr>
@@ -110,31 +133,34 @@
           </td>
 
           {% if tab in ('combined', 'races') %}
-            {% for p in [1,2,3,4,5] %}
-            <td class="text-center">
-              {% if tab == 'combined' %}
-                {% set rv = row.race_hits[p] %}
-                {% set sv = row.sprint_hits[p] %}
-                {% if rv > 0 or sv > 0 %}
-                  <span style="white-space:nowrap"><span style="color:var(--accent);font-weight:700">{{ rv if rv > 0 else '—' }}</span>{% if sv > 0 %}<span style="font-size:.6em;color:var(--purple);font-weight:700;vertical-align:super;margin-left:1px">{{ sv }}</span>{% endif %}</span>
-                {% else %}
-                  <span style="color:var(--text-3)">—</span>
-                {% endif %}
-              {% else %}
-                {% set v = row.hits[p] %}
-                {% if v > 0 %}<span style="color:var(--accent);font-weight:700">{{ v }}</span>
-                {% else %}<span style="color:var(--text-3)">—</span>{% endif %}
-              {% endif %}
-            </td>
-            {% endfor %}
+          {% for p in [1,2,3,4,5] %}
+          <td class="text-center">
+            {% if tab == 'combined' %}
+            {% set rv = row.race_hits[p] %}
+            {% set sv = row.sprint_hits[p] %}
+            {% if rv > 0 or sv > 0 %}
+            <span style="white-space:nowrap"><span style="color:var(--accent);font-weight:700">{{ rv if rv > 0 else '—'
+                }}</span>{% if sv > 0 %}<span
+                style="font-size:.6em;color:var(--purple);font-weight:700;vertical-align:super;margin-left:1px">{{ sv
+                }}</span>{% endif %}</span>
+            {% else %}
+            <span style="color:var(--text-3)">—</span>
+            {% endif %}
+            {% else %}
+            {% set v = row.hits[p] %}
+            {% if v > 0 %}<span style="color:var(--accent);font-weight:700">{{ v }}</span>
+            {% else %}<span style="color:var(--text-3)">—</span>{% endif %}
+            {% endif %}
+          </td>
+          {% endfor %}
           {% elif tab == 'sprints' %}
-            {% for p in [1,2,3] %}
-            <td class="text-center">
-              {% set v = row.hits[p] %}
-              {% if v > 0 %}<span style="color:var(--accent);font-weight:700">{{ v }}</span>
-              {% else %}<span style="color:var(--text-3)">—</span>{% endif %}
-            </td>
-            {% endfor %}
+          {% for p in [1,2,3] %}
+          <td class="text-center">
+            {% set v = row.hits[p] %}
+            {% if v > 0 %}<span style="color:var(--accent);font-weight:700">{{ v }}</span>
+            {% else %}<span style="color:var(--text-3)">—</span>{% endif %}
+          </td>
+          {% endfor %}
           {% endif %}
 
           <td class="text-end lb-total">{{ row.total }}</td>
@@ -174,7 +200,8 @@
             {% elif loop.index == 3 %}🥉
             {% else %}<span style="color:var(--text-3)">{{ loop.index }}</span>{% endif %}
           </td>
-          <td style="font-weight:600"><a href="{{ url_for('predictions.user_predictions', user_id=row.user_id) }}" class="lb-user-link">{{ row.username }}</a></td>
+          <td style="font-weight:600"><a href="{{ url_for('predictions.user_predictions', user_id=row.user_id) }}"
+              class="lb-user-link">{{ row.username }}</a></td>
           {% for p in [1,2,3,4,5] %}
           <td class="text-center">
             {% set v = row.hits[p] %}

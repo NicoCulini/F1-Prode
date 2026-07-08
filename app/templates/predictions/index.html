@@ -63,7 +63,7 @@
         {% for d in race_data %}
         {% set race=d.race %} {% set pred=d.pred %} {% set picks=d.picks %} {% set res=d.res %}
         {% set is_other = viewed_user is defined and viewed_user and viewed_user.id != current_user.id %}
-        {% set can_see_picks = (not is_other) or race.is_completed or (my_preds is not none and race.id in my_preds) %}
+        {% set can_see_picks = (not is_other) or (locked_races is not none and race.id in locked_races) %}
         {% set has_extra = (picks|length > 2 or res|length > 2) and can_see_picks %}
         <tr class="pred-row" data-rid="{{ race.id }}">
           <td style="width:28px;vertical-align:middle">
@@ -88,7 +88,7 @@
                 </div>
               {% endfor %}
             {% elif picks and not can_see_picks %}
-              <span style="color:var(--text-3);font-size:.78rem;font-style:italic">Submit yours first</span>
+              <span style="color:var(--text-3);font-size:.78rem;font-style:italic">Locked until predictions close</span>
             {% else %}
               <span style="color:var(--text-3)">—</span>
             {% endif %}
@@ -124,7 +124,7 @@
   {% for d in race_data %}
   {% set race=d.race %} {% set pred=d.pred %} {% set picks=d.picks %} {% set res=d.res %}
   {% set is_other = viewed_user is defined and viewed_user and viewed_user.id != current_user.id %}
-  {% set can_see_picks = (not is_other) or (my_preds is not none and race.id in my_preds) %}
+  {% set can_see_picks = (not is_other) or (locked_races is not none and race.id in locked_races) %}
   {% set has_extra = (picks|length > 2 or res|length > 2) and can_see_picks %}
 
   <div class="card mb-2 pred-row" data-rid="m{{ race.id }}" {% if has_extra %}style="cursor:pointer"{% endif %}>
@@ -163,7 +163,7 @@
               </div>
             {% endfor %}
           {% elif picks and not can_see_picks %}
-            <span style="color:var(--text-3);font-size:.78rem;font-style:italic">Submit yours first</span>
+            <span style="color:var(--text-3);font-size:.78rem;font-style:italic">Locked until predictions close</span>
           {% else %}
             <span style="color:var(--text-3);font-size:.8rem">—</span>
           {% endif %}

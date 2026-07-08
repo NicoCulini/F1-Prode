@@ -39,7 +39,7 @@ def index():
                            past_races=races,
                            user_preds=user_preds,
                            results=results,
-                           my_preds=None)
+                           locked_races=None)
 
 
 @predictions_bp.route('/user/<int:user_id>')
@@ -50,14 +50,14 @@ def user_predictions(user_id):
     races = _visible_races()
     user_preds = {p.race_id: p for p in Prediction.query.filter_by(user_id=user_id).all()}
     results = {r.race_id: r for r in RaceResult.query.all()}
-    # Race IDs where the *viewing* user has submitted — gates upcoming race picks
-    my_preds = {p.race_id for p in Prediction.query.filter_by(user_id=current_user.id).all()}
+    # Race IDs whose predictions have locked (completed, or within 2h of start) — gates viewing others' picks
+    locked_races = {race.id for race in races if race.is_completed or _is_locked(race)}
     return render_template('predictions/index.html',
                            past_races=races,
                            user_preds=user_preds,
                            results=results,
                            viewed_user=viewed_user,
-                           my_preds=my_preds)
+                           locked_races=locked_races)
 
 
 @predictions_bp.route('/race/<int:race_id>', methods=['GET', 'POST'])

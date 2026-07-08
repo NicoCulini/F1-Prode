@@ -361,6 +361,23 @@ a:hover { color: #ff3330; }
   border-radius: 20px; text-transform: uppercase;
 }
 
+/* ── Live badge ───────────────────────────────── */
+.live-badge {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: rgba(230,88,79,.12); color: #e6584f;
+  font-size: .65rem; font-weight: 700;
+  letter-spacing: .07em; padding: .15rem .55rem;
+  border-radius: 20px; vertical-align: middle; margin-left: .5rem;
+}
+.live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #e6584f; animation: live-pulse 1.4s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .3; }
+}
+
 /* ── Chip / pill ──────────────────────────────── */
 .chip {
   display: inline-block;

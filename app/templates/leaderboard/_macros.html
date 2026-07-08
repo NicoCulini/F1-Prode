@@ -1,0 +1,120 @@
+{% macro lb_table(rows, tab, compact=false) %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th style="width:40px">#</th>
+          <th>Player</th>
+          {% if tab in ('combined', 'races') %}
+            <th class="text-center">P1</th>
+            <th class="text-center">P2</th>
+            <th class="text-center">P3</th>
+            <th class="text-center">P4</th>
+            <th class="text-center">P5</th>
+          {% elif tab == 'sprints' %}
+            <th class="text-center">P1</th>
+            <th class="text-center">P2</th>
+            <th class="text-center">P3</th>
+          {% endif %}
+          <th class="text-end">Pts</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr class="lb-row-{{ loop.index if loop.index <= 3 else '' }}">
+          <td>
+            {% if loop.index == 1 %}🥇
+            {% elif loop.index == 2 %}🥈
+            {% elif loop.index == 3 %}🥉
+            {% else %}<span style="color:var(--text-3)">{{ loop.index }}</span>{% endif %}
+          </td>
+          <td style="font-weight:600">
+            <a href="{{ url_for('predictions.user_predictions', user_id=row.user.id) }}" class="lb-user-link">
+              {{ row.user.username }}
+            </a>
+          </td>
+
+          {% if tab in ('combined', 'races') %}
+            {% for p in [1,2,3,4,5] %}
+            <td class="text-center">
+              {% if tab == 'combined' %}
+                {% set rv = row.race_hits[p] %}
+                {% set sv = row.sprint_hits[p] %}
+                {% if rv > 0 or sv > 0 %}
+                  <span style="white-space:nowrap"><span style="color:var(--accent);font-weight:700">{{ rv if rv > 0 else '—' }}</span>{% if sv > 0 %}<span style="font-size:.6em;color:var(--purple);font-weight:700;vertical-align:super;margin-left:1px">{{ sv }}</span>{% endif %}</span>
+                {% else %}
+                  <span style="color:var(--text-3)">—</span>
+                {% endif %}
+              {% else %}
+                {% set v = row.hits[p] %}
+                {% if v > 0 %}<span style="color:var(--accent);font-weight:700">{{ v }}</span>
+                {% else %}<span style="color:var(--text-3)">—</span>{% endif %}
+              {% endif %}
+            </td>
+            {% endfor %}
+          {% elif tab == 'sprints' %}
+            {% for p in [1,2,3] %}
+            <td class="text-center">
+              {% set v = row.hits[p] %}
+              {% if v > 0 %}<span style="color:var(--accent);font-weight:700">{{ v }}</span>
+              {% else %}<span style="color:var(--text-3)">—</span>{% endif %}
+            </td>
+            {% endfor %}
+          {% endif %}
+
+          <td class="text-end lb-total">{{ row.total }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endmacro %}
+
+
+{% macro tapia_overall(overall) %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th style="width:40px">#</th>
+          <th>Player</th>
+          <th class="text-center">P1</th>
+          <th class="text-center">P2</th>
+          <th class="text-center">P3</th>
+          <th class="text-center">P4</th>
+          <th class="text-center">P5</th>
+          <th class="text-center">H1</th>
+          <th class="text-center">H2</th>
+          <th class="text-end">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in overall %}
+        <tr class="lb-row-{{ loop.index if loop.index <= 3 else '' }}">
+          <td>
+            {% if loop.index == 1 %}🥇
+            {% elif loop.index == 2 %}🥈
+            {% elif loop.index == 3 %}🥉
+            {% else %}<span style="color:var(--text-3)">{{ loop.index }}</span>{% endif %}
+          </td>
+          <td style="font-weight:600"><a href="{{ url_for('predictions.user_predictions', user_id=row.user_id) }}" class="lb-user-link">{{ row.username }}</a></td>
+          {% for p in [1,2,3,4,5] %}
+          <td class="text-center">
+            {% set v = row.hits[p] %}
+            {% if v > 0 %}<span style="color:var(--accent);font-weight:700">{{ v }}</span>
+            {% else %}<span style="color:var(--text-3)">—</span>{% endif %}
+          </td>
+          {% endfor %}
+          <td class="text-center" style="color:var(--text-2)">{{ row.h1 }}</td>
+          <td class="text-center" style="color:var(--text-2)">{{ row.h2 }}</td>
+          <td class="text-end lb-total">{{ row.total }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endmacro %}

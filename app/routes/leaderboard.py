@@ -1,7 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request
 from app.models import User, Race, Prediction, RaceResult, Setting
+from app.scraper import fetch_live_positions
 from config import Config
+
+LIVE_WINDOW_HOURS = {'race': 3, 'sprint': 1.5}
 
 
 def _current_half():
@@ -15,17 +18,44 @@ def _current_half():
         return f'h{next_race.season_half}'
     return 'overall'
 
+
+def _live_race():
+    """Return the Race currently on track (started, not yet expected to be over,
+    not marked completed), or None."""
+    now = datetime.utcnow()
+    candidates = (Race.query
+                  .filter_by(season=Config.CURRENT_SEASON, is_completed=False)
+                  .filter(Race.race_date != None)
+                  .filter(Race.race_date <= now)
+                  .order_by(Race.race_date)
+                  .all())
+    for race in candidates:
+        window = timedelta(hours=LIVE_WINDOW_HOURS.get(race.race_type, 3))
+        if now <= race.race_date + window:
+            return race
+    return None
+
+
 leaderboard_bp = Blueprint('leaderboard', __name__)
 
 
-def _build(season_half=None, race_type=None):
-    """Return sorted rows with per-position hit counts and total points."""
+def _build(season_half=None, race_type=None, live_race=None, live_positions=None):
+    """Return sorted rows with per-position hit counts and total points.
+    If live_race/live_positions are given and match this scope's filters, its
+    provisional points are folded into the totals on top of completed races —
+    nothing is written to the DB, this is purely for display."""
     q = Race.query.filter_by(season=Config.CURRENT_SEASON, is_completed=True)
     if season_half is not None:
         q = q.filter_by(season_half=season_half)
     if race_type is not None:
         q = q.filter_by(race_type=race_type)
     races = q.order_by(Race.race_date).all()
+
+    live_applies = (
+        live_race is not None and live_positions
+        and (season_half is None or live_race.season_half == season_half)
+        and (race_type is None or live_race.race_type == race_type)
+    )
 
     users = User.query.order_by(User.username).all()
     rows = []
@@ -49,6 +79,21 @@ def _build(season_half=None, race_type=None):
                         sprint_hits[i + 1] += 1
                     else:
                         race_hits[i + 1] += 1
+
+        if live_applies:
+            pred = Prediction.query.filter_by(user_id=user.id, race_id=live_race.id).first()
+            if pred:
+                plist = [pred.pos1, pred.pos2, pred.pos3, pred.pos4, pred.pos5]
+                for i in range(live_race.max_positions):
+                    if (i < len(live_positions) and plist[i] and live_positions[i]
+                            and plist[i].lower() == live_positions[i].lower()):
+                        hits[i + 1] += 1
+                        total += live_race.position_points[i]
+                        if live_race.race_type == 'sprint':
+                            sprint_hits[i + 1] += 1
+                        else:
+                            race_hits[i + 1] += 1
+
         rows.append({'user': user, 'total': total, 'hits': hits,
                      'race_hits': race_hits, 'sprint_hits': sprint_hits,
                      'total_hits': sum(hits.values())})
@@ -78,29 +123,44 @@ def _tapia_overall(h1_rows, h2_rows):
     return combined
 
 
+def _render(mode, tab, half, live_race):
+    live_positions = fetch_live_positions(live_race) if live_race else None
+
+    if mode == 'normal':
+        data = {
+            'combined': _build(live_race=live_race, live_positions=live_positions),
+            'races':    _build(race_type='race', live_race=live_race, live_positions=live_positions),
+            'sprints':  _build(race_type='sprint', live_race=live_race, live_positions=live_positions),
+        }
+        return dict(mode='normal', tab=tab, half='overall', data=data, live_race=live_race)
+    else:
+        h1 = {'combined': _build(1, live_race=live_race, live_positions=live_positions),
+              'races':    _build(1, 'race', live_race=live_race, live_positions=live_positions),
+              'sprints':  _build(1, 'sprint', live_race=live_race, live_positions=live_positions)}
+        h2 = {'combined': _build(2, live_race=live_race, live_positions=live_positions),
+              'races':    _build(2, 'race', live_race=live_race, live_positions=live_positions),
+              'sprints':  _build(2, 'sprint', live_race=live_race, live_positions=live_positions)}
+        overall = _tapia_overall(h1['combined'], h2['combined'])
+        show_overall = Setting.get('show_overall') == 'true'
+        if not show_overall and half == 'overall':
+            half = 'h1'
+        return dict(mode='tapia', tab=tab, half=half, h1=h1, h2=h2,
+                    overall=overall, show_overall=show_overall, live_race=live_race)
+
+
 @leaderboard_bp.route('/')
 def index():
     mode = request.args.get('mode', 'tapia')
     tab  = request.args.get('tab',  'combined')
     half = request.args.get('half', _current_half())
+    ctx = _render(mode, tab, half, _live_race())
+    return render_template('leaderboard/index.html', **ctx)
 
-    if mode == 'normal':
-        data = {
-            'combined': _build(),
-            'races':    _build(race_type='race'),
-            'sprints':  _build(race_type='sprint'),
-        }
-        return render_template('leaderboard/index.html',
-                               mode='normal', tab=tab, half='overall', data=data)
-    else:
-        h1 = {'combined': _build(1), 'races': _build(1, 'race'), 'sprints': _build(1, 'sprint')}
-        h2 = {'combined': _build(2), 'races': _build(2, 'race'), 'sprints': _build(2, 'sprint')}
-        overall = _tapia_overall(h1['combined'], h2['combined'])
-        show_overall = Setting.get('show_overall') == 'true'
-        # If overall is hidden and user somehow lands on it, redirect to h1
-        if not show_overall and half == 'overall':
-            half = 'h1'
-        return render_template('leaderboard/index.html',
-                               mode='tapia', tab=tab, half=half,
-                               h1=h1, h2=h2, overall=overall,
-                               show_overall=show_overall)
+
+@leaderboard_bp.route('/live-refresh')
+def live_refresh():
+    mode = request.args.get('mode', 'tapia')
+    tab  = request.args.get('tab',  'combined')
+    half = request.args.get('half', _current_half())
+    ctx = _render(mode, tab, half, _live_race())
+    return render_template('leaderboard/_table.html', **ctx)

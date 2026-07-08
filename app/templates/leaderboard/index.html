@@ -63,12 +63,56 @@
   var half = {{ half|tojson }};
   var container = document.getElementById('lb-table-container');
 
+  function captureRows() {
+    var snapshot = {};
+    container.querySelectorAll('tr[data-user-id]').forEach(function (row) {
+      snapshot[row.dataset.userId] = {
+        top: row.getBoundingClientRect().top,
+        total: parseFloat(row.dataset.total),
+      };
+    });
+    return snapshot;
+  }
+
+  // FLIP: rows have already moved to their new DOM position by the time this
+  // runs — we slide each one in from where it *used to* be, back to 0, so a
+  // rank change reads as a smooth move instead of an instant jump.
+  function animateRows(before) {
+    container.querySelectorAll('tr[data-user-id]').forEach(function (row) {
+      var prev = before[row.dataset.userId];
+      if (!prev) return;
+
+      var deltaY = prev.top - row.getBoundingClientRect().top;
+      if (deltaY) {
+        row.style.transition = 'none';
+        row.style.transform = 'translateY(' + deltaY + 'px)';
+        row.getBoundingClientRect(); // force reflow before enabling the transition
+        requestAnimationFrame(function () {
+          row.style.transition = 'transform 500ms cubic-bezier(.4,0,.2,1)';
+          row.style.transform = '';
+        });
+        row.classList.add(deltaY > 0 ? 'lb-row-move-up' : 'lb-row-move-down');
+        setTimeout(function () {
+          row.classList.remove('lb-row-move-up', 'lb-row-move-down');
+        }, 900);
+      } else if (parseFloat(row.dataset.total) > prev.total) {
+        var ptsCell = row.querySelector('.lb-total');
+        if (ptsCell) {
+          ptsCell.classList.add('flash-fill');
+          setTimeout(function () { ptsCell.classList.remove('flash-fill'); }, 500);
+        }
+      }
+    });
+  }
+
   function refresh() {
+    var before = captureRows();
     fetch('{{ url_for("leaderboard.live_refresh") }}?mode=' + encodeURIComponent(mode)
           + '&tab=' + encodeURIComponent(tab) + '&half=' + encodeURIComponent(half))
       .then(function (r) { return r.text(); })
       .then(function (html) {
         container.innerHTML = html;
+        animateRows(before);
         var marker = container.querySelector('[data-live-status]');
         if (!marker || marker.dataset.liveStatus !== 'live') {
           clearInterval(intervalId);

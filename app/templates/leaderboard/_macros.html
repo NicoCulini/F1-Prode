@@ -22,7 +22,7 @@
       </thead>
       <tbody>
         {% for row in rows %}
-        <tr class="lb-row-{{ loop.index if loop.index <= 3 else '' }}">
+        <tr class="lb-row-{{ loop.index if loop.index <= 3 else '' }}" data-user-id="{{ row.user.id }}" data-total="{{ row.total }}">
           <td>
             {% if loop.index == 1 %}🥇
             {% elif loop.index == 2 %}🥈
@@ -93,7 +93,7 @@
       </thead>
       <tbody>
         {% for row in overall %}
-        <tr class="lb-row-{{ loop.index if loop.index <= 3 else '' }}">
+        <tr class="lb-row-{{ loop.index if loop.index <= 3 else '' }}" data-user-id="{{ row.user_id }}" data-total="{{ row.total }}">
           <td>
             {% if loop.index == 1 %}🥇
             {% elif loop.index == 2 %}🥈

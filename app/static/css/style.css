@@ -529,6 +529,12 @@ a:hover { color: #ff3330; }
 .lb-row-3 td { color: #b87333; }
 .lb-row-1 td:last-child, .lb-row-2 td:last-child, .lb-row-3 td:last-child { color: inherit; }
 
+/* ── Live row-move animation ─────────────────── */
+.lb-row-move-up   { animation: lb-flash-up   900ms ease-out; }
+.lb-row-move-down { animation: lb-flash-down 900ms ease-out; }
+@keyframes lb-flash-up   { 0% { background: rgba(116,198,157,.22); } 100% { background: transparent; } }
+@keyframes lb-flash-down { 0% { background: rgba(230,88,79,.16);  } 100% { background: transparent; } }
+
 /* ── Score pill ──────────────────────────────── */
 .score-pill { display: inline-block; font-size: .78rem; font-weight: 700; padding: .18rem .55rem; border-radius: 20px; }
 .score-pill-pos  { background: var(--green-bg); color: var(--green); }

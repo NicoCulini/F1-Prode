@@ -1,3 +1,5 @@
+import logging
+import time
 import requests
 from datetime import datetime, timezone
 from app import db
@@ -6,21 +8,30 @@ from app.models import Race, Driver, RaceResult, Prediction
 OPEN_F1 = 'https://api.openf1.org/v1'
 TIMEOUT = 10
 
+logger = logging.getLogger(__name__)
+
 
 # ── Core HTTP ────────────────────────────────────────────────────────────────
 
 def _get(path, **params):
-    """GET an OpenF1 endpoint, return parsed JSON list or raise RuntimeError."""
-    try:
-        resp = requests.get(
-            f'{OPEN_F1}/{path}',
-            params={k: v for k, v in params.items() if v is not None},
-            timeout=TIMEOUT,
-        )
-        resp.raise_for_status()
-        return resp.json()
-    except Exception as e:
-        raise RuntimeError(str(e))
+    """GET an OpenF1 endpoint, return parsed JSON list or raise RuntimeError.
+    Retries once on transient network errors (not on HTTP 4xx/5xx)."""
+    query = {k: v for k, v in params.items() if v is not None}
+    last_err = None
+    for attempt in range(2):
+        try:
+            resp = requests.get(f'{OPEN_F1}/{path}', params=query, timeout=TIMEOUT)
+            resp.raise_for_status()
+            return resp.json()
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            last_err = e
+            logger.warning('OpenF1 request failed (attempt %d/2) for %s %s: %s', attempt + 1, path, query, e)
+            if attempt == 0:
+                time.sleep(1)
+        except Exception as e:
+            logger.error('OpenF1 request error for %s %s: %s', path, query, e)
+            raise RuntimeError(str(e))
+    raise RuntimeError(str(last_err))
 
 
 # ── Meetings / session helpers ───────────────────────────────────────────────
@@ -37,10 +48,13 @@ def _race_meetings(season):
     )
 
 
-def _session_key(season, round_number, session_type, session_name=None):
-    """Return the session_key for a given round number + session type, or None.
+def _find_session(season, round_number, session_type, session_name=None):
+    """Return the session dict for a given round number + session type, or None.
     Pass session_name to disambiguate when multiple sessions share a type
-    (e.g. 'Qualifying' vs 'Sprint Qualifying' both have session_type='Qualifying').
+    (e.g. both 'Race' and 'Sprint' have session_type='Race' on a sprint weekend;
+    'Qualifying' vs 'Sprint Qualifying' both have session_type='Qualifying').
+    Sessions are sorted by date_start before picking, since OpenF1 gives no
+    ordering guarantee and there can be more than one match per type.
     """
     meetings = _race_meetings(season)
     if round_number < 1 or round_number > len(meetings):
@@ -49,7 +63,8 @@ def _session_key(season, round_number, session_type, session_name=None):
     sessions = _get('sessions', meeting_key=meeting_key, session_type=session_type)
     if session_name:
         sessions = [s for s in sessions if s.get('session_name') == session_name]
-    return sessions[0]['session_key'] if sessions else None
+    sessions = sorted(sessions, key=lambda s: s['date_start'])
+    return sessions[0] if sessions else None
 
 
 def _final_positions(session_key):
@@ -74,10 +89,11 @@ def fetch_qualifying_top10(race):
     """
     try:
         session_name = 'Sprint Qualifying' if race.race_type == 'sprint' else 'Qualifying'
-        sk = _session_key(race.season, race.round_number, 'Qualifying',
-                          session_name=session_name)
-        if not sk:
+        session = _find_session(race.season, race.round_number, 'Qualifying',
+                                session_name=session_name)
+        if not session:
             return []
+        sk = session['session_key']
 
         positions = _final_positions(sk)
         if not positions:
@@ -102,12 +118,21 @@ def fetch_qualifying_top10(race):
 
 
 def fetch_race_result(race):
-    """Fetch top 5 finishers from OpenF1, save result, and score predictions."""
+    """Fetch top 5 finishers from OpenF1, save result, and score predictions.
+    Both the main Race and the Sprint share session_type='Race' on OpenF1 —
+    they're only distinguished by session_name — so session_name must always
+    be passed to avoid picking up the wrong one (see fetch_qualifying_top10)."""
     try:
-        session_type = 'Sprint' if race.race_type == 'sprint' else 'Race'
-        sk = _session_key(race.season, race.round_number, session_type)
-        if not sk:
+        session_name = 'Sprint' if race.race_type == 'sprint' else 'Race'
+        session = _find_session(race.season, race.round_number, 'Race',
+                                session_name=session_name)
+        if not session:
             return False, 'Session not found for this round.'
+        if session.get('session_name') != session_name:
+            logger.error('Session name mismatch for race %s: expected %s, got %s',
+                        race.id, session_name, session.get('session_name'))
+            return False, 'Session mismatch — refusing to save wrong result.'
+        sk = session['session_key']
 
         positions = _final_positions(sk)
         if not positions:
@@ -123,6 +148,7 @@ def fetch_race_result(race):
             top5.append(None)
 
     except Exception as e:
+        logger.error('fetch_race_result failed for race %s (%s): %s', race.id, race.name, e)
         return False, f'API error: {e}'
 
     existing = RaceResult.query.filter_by(race_id=race.id).first()
@@ -148,6 +174,46 @@ def fetch_race_result(race):
     except Exception as e:
         db.session.rollback()
         return False, str(e)
+
+
+_LIVE_CACHE = {}       # race_id -> (monotonic_ts, [names])
+_LIVE_CACHE_TTL = 8    # seconds — just under the 10s frontend poll interval
+
+
+def fetch_live_positions(race):
+    """Return an ordered list of driver last names (top race.max_positions) for
+    the race's in-progress session, or None if unavailable. Never writes to the
+    DB — this is a provisional read used only to render live standings.
+    Briefly cached so rapid polling doesn't hammer OpenF1; falls back to the
+    last good cached value on error instead of raising."""
+    now = time.monotonic()
+    cached = _LIVE_CACHE.get(race.id)
+    if cached and now - cached[0] < _LIVE_CACHE_TTL:
+        return cached[1]
+
+    try:
+        session_name = 'Sprint' if race.race_type == 'sprint' else 'Race'
+        session = _find_session(race.season, race.round_number, 'Race',
+                                session_name=session_name)
+        if not session or session.get('session_name') != session_name:
+            return cached[1] if cached else None
+        sk = session['session_key']
+
+        positions = _final_positions(sk)
+        if not positions:
+            return cached[1] if cached else None
+
+        driver_map = {d['driver_number']: d
+                      for d in _get('drivers', session_key=sk)}
+
+        ordered = sorted(positions.items(), key=lambda x: x[1])[:race.max_positions]
+        names = [driver_map.get(dn, {}).get('last_name', str(dn)) for dn, _ in ordered]
+    except Exception as e:
+        logger.warning('fetch_live_positions failed for race %s: %s', race.id, e)
+        return cached[1] if cached else None
+
+    _LIVE_CACHE[race.id] = (now, names)
+    return names
 
 
 def fetch_season_drivers(season):

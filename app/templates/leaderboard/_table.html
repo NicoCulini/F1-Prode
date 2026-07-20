@@ -1,0 +1,30 @@
+{% from "leaderboard/_macros.html" import lb_table, tapia_overall %}
+
+{% if mode == 'normal' %}
+
+  {% set rows = data[tab] %}
+  {% if not rows %}
+    <div class="card text-center py-5" style="color:var(--text-3)">No completed {{ tab }} yet.</div>
+  {% else %}
+    {{ lb_table(rows, tab) }}
+  {% endif %}
+
+{% else %}{# tapia #}
+
+  {% if half == 'h1' %}
+    {% set rows = h1[tab] %}
+    {% if rows %}{{ lb_table(rows, tab) }}
+    {% else %}<div class="card text-center py-4" style="color:var(--text-3)">No First Half results yet.</div>{% endif %}
+
+  {% elif half == 'h2' %}
+    {% set rows = h2[tab] %}
+    {% if rows %}{{ lb_table(rows, tab) }}
+    {% else %}<div class="card text-center py-4" style="color:var(--text-3)">No Second Half results yet.</div>{% endif %}
+
+  {% else %}{# overall #}
+    {% if overall %}{{ tapia_overall(overall) }}
+    {% else %}<div class="card text-center py-4" style="color:var(--text-3)">No results yet.</div>{% endif %}
+  {% endif %}
+
+{% endif %}
+<div data-live-status="{{ 'live' if live_race else 'ended' }}" style="display:none"></div>

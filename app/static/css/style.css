@@ -361,6 +361,23 @@ a:hover { color: #ff3330; }
   border-radius: 20px; text-transform: uppercase;
 }
 
+/* ── Live badge ───────────────────────────────── */
+.live-badge {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: rgba(230,88,79,.12); color: #e6584f;
+  font-size: .65rem; font-weight: 700;
+  letter-spacing: .07em; padding: .15rem .55rem;
+  border-radius: 20px; vertical-align: middle; margin-left: .5rem;
+}
+.live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #e6584f; animation: live-pulse 1.4s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .3; }
+}
+
 /* ── Chip / pill ──────────────────────────────── */
 .chip {
   display: inline-block;
@@ -511,6 +528,12 @@ a:hover { color: #ff3330; }
 .lb-row-2 td { color: #c0c0c0; }
 .lb-row-3 td { color: #b87333; }
 .lb-row-1 td:last-child, .lb-row-2 td:last-child, .lb-row-3 td:last-child { color: inherit; }
+
+/* ── Live row-move animation ─────────────────── */
+.lb-row-move-up   { animation: lb-flash-up   900ms ease-out; }
+.lb-row-move-down { animation: lb-flash-down 900ms ease-out; }
+@keyframes lb-flash-up   { 0% { background: rgba(116,198,157,.22); } 100% { background: transparent; } }
+@keyframes lb-flash-down { 0% { background: rgba(230,88,79,.16);  } 100% { background: transparent; } }
 
 /* ── Score pill ──────────────────────────────── */
 .score-pill { display: inline-block; font-size: .78rem; font-weight: 700; padding: .18rem .55rem; border-radius: 20px; }

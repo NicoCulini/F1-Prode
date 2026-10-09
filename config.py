@@ -1,10 +1,13 @@
 import os
+from datetime import timedelta
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'f1-prode-dev-key-change-in-production')
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'sqlite:///f1prode.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     CURRENT_SEASON = 2026
+    # Static files (css/images) are URL-versioned, so they can be cached for a long time.
+    SEND_FILE_MAX_AGE_DEFAULT = timedelta(days=30)
 
 
 def generate_secret_key():

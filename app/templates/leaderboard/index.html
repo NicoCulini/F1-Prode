@@ -51,7 +51,7 @@
   {% for race in history_races %}
   {% set ganador = history_lider[race.id] %}
   <div class="leader-card">
-    <img class="leader-avatar" src="{{ url_for('auth.avatar', user_id=ganador.id) }}" alt="{{ ganador.username }}">
+    <img class="leader-avatar" src="{{ avatar_url(ganador) }}" alt="{{ ganador.username }}">
     <div class="leader-name">{{ ganador.username }}</div>
     <div class="leader-round">R{{ race.round_number }}{% if race.race_type == 'sprint' %} · Sprint{% endif %}</div>
   </div>

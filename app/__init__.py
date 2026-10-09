@@ -12,6 +12,9 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
 
     db.init_app(app)
+
+    from app.avatars import avatar_url, static_url
+    app.jinja_env.globals.update(avatar_url=avatar_url, static_url=static_url)
     login_manager.init_app(app)
     login_manager.login_view = 'auth.login'
     login_manager.login_message = 'Please log in to access this page.'

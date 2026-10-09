@@ -5,15 +5,12 @@ from werkzeug.security import generate_password_hash
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from app import db
 from app.models import User
+from app.avatars import avatar_dir as _avatar_dir, uploaded_avatar_path, legacy_avatar_filename
 
 auth_bp = Blueprint('auth', __name__)
 
 RESET_MAX_AGE = 3600  # seconds
 AVATAR_MAX_BYTES = 2 * 1024 * 1024
-
-
-def _avatar_dir():
-    return os.path.join(current_app.instance_path, 'avatars')
 
 
 def _sniff_image_ext(data):
@@ -157,19 +154,18 @@ def reset_password(token):
 
 @auth_bp.route('/avatar/<int:user_id>')
 def avatar(user_id):
-    """Uploaded picture, else the bundled static/img/users/<username>.png, else the default."""
-    for ext in ('png', 'jpg', 'webp'):
-        path = os.path.join(_avatar_dir(), f'{user_id}.{ext}')
-        if os.path.exists(path):
-            return send_file(path, max_age=0)
+    """Serve an uploaded picture. URLs carry ?v=<mtime> (see app.avatars.avatar_url), so the
+    response can be cached for a year; a new upload changes the URL."""
+    path = uploaded_avatar_path(user_id)
+    if path:
+        return send_file(path, max_age=31536000)
     user = User.query.get(user_id)
     if not user:
         abort(404)
-    static_dir = os.path.join(current_app.static_folder, 'img')
-    legacy = os.path.join(static_dir, 'users', f'{user.username.lower()}.png')
-    if os.path.exists(legacy):
-        return send_file(legacy, max_age=0)
-    return send_file(os.path.join(static_dir, 'default-avatar.webp'), max_age=0)
+    legacy = legacy_avatar_filename(user.username)
+    fallback = (os.path.join(current_app.static_folder, legacy) if legacy
+                else os.path.join(current_app.static_folder, 'img', 'default-avatar.jpg'))
+    return send_file(fallback, max_age=3600)
 
 
 @auth_bp.route('/change-avatar', methods=['POST'])

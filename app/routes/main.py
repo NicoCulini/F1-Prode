@@ -39,5 +39,9 @@ def index():
             already_predicted = Prediction.query.filter_by(
                 user_id=current_user.id, race_id=next_race.id).first() is not None
 
-    return render_template('index.html', next_race=next_race, recent=recent,
+    lock_iso = None
+    if next_race and next_race.race_date:
+        lock_iso = (next_race.race_date - timedelta(hours=2)).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    return render_template('index.html', next_race=next_race, recent=recent, lock_iso=lock_iso,
                            user_preds=user_preds, already_predicted=already_predicted)

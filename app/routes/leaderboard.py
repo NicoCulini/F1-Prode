@@ -20,9 +20,56 @@ def _current_half():
 leaderboard_bp = Blueprint('leaderboard', __name__)
 
 
-def _build(season_half=None, race_type=None):
+def _rank_key(total, tiebreak, username):
+    """Standings order: points, then the player's season-wide race P1..P5 counts, then
+    season-wide sprint P1..P3 counts (each higher-is-better), then username so the
+    order is always stable. `tiebreak` is (race_hits, sprint_hits) over ALL completed
+    races, regardless of which half or tab is being displayed."""
+    race_hits, sprint_hits = tiebreak
+    return (-total,
+            *(-race_hits[p] for p in range(1, 6)),
+            *(-sprint_hits[p] for p in range(1, 4)),
+            username)
+
+
+def _empty_hits():
+    return {p: 0 for p in range(1, 6)}
+
+
+def _count_hits(pred, result, race, race_hits, sprint_hits):
+    """Add this prediction's exact-position hits into race_hits or sprint_hits; return points."""
+    plist = [pred.pos1, pred.pos2, pred.pos3, pred.pos4, pred.pos5]
+    rlist = [result.pos1, result.pos2, result.pos3, result.pos4, result.pos5]
+    target = sprint_hits if race.race_type == 'sprint' else race_hits
+    points = 0
+    for i in range(race.max_positions):
+        if plist[i] and rlist[i] and plist[i].lower() == rlist[i].lower():
+            target[i + 1] += 1
+            points += race.position_points[i]
+    return points
+
+
+def _global_tiebreak():
+    """{user_id: (race_hits, sprint_hits)} over every completed race of the season."""
+    races = Race.query.filter_by(season=Config.CURRENT_SEASON, is_completed=True).all()
+    race_ids = [r.id for r in races]
+    preds = Prediction.query.filter(Prediction.race_id.in_(race_ids)).all()
+    results = {r.race_id: r for r in RaceResult.query.filter(RaceResult.race_id.in_(race_ids)).all()}
+    race_by_id = {r.id: r for r in races}
+    stats = {u.id: (_empty_hits(), _empty_hits()) for u in User.query.all()}
+    for pred in preds:
+        result = results.get(pred.race_id)
+        if result and pred.user_id in stats:
+            _count_hits(pred, result, race_by_id[pred.race_id], *stats[pred.user_id])
+    return stats
+
+
+def _build(season_half=None, race_type=None, tiebreak=None):
     """Return sorted rows with per-position hit counts and total points
-    over the completed races matching the filters."""
+    over the completed races matching the filters. Ties are broken with season-wide
+    stats (see _rank_key), not just the races in this scope."""
+    if tiebreak is None:
+        tiebreak = _global_tiebreak()
     q = Race.query.filter_by(season=Config.CURRENT_SEASON, is_completed=True)
     if season_half is not None:
         q = q.filter_by(season_half=season_half)
@@ -65,13 +112,13 @@ def _build(season_half=None, race_type=None):
                      'race_hits': race_hits, 'sprint_hits': sprint_hits,
                      'total_hits': sum(hits.values())})
 
-    rows.sort(key=lambda x: (-x['total'], x['user'].username))
+    rows.sort(key=lambda x: _rank_key(x['total'], tiebreak[x['user'].id], x['user'].username))
     for i, row in enumerate(rows):
         row['rank'] = i + 1
     return rows
 
 
-def _tapia_overall(h1_rows, h2_rows):
+def _tapia_overall(h1_rows, h2_rows, tiebreak):
     h1_map = {r['user'].username: r for r in h1_rows}
     h2_map = {r['user'].username: r for r in h2_rows}
     combined = []
@@ -84,28 +131,29 @@ def _tapia_overall(h1_rows, h2_rows):
         t = h1_total + h2_total
         combined.append({'username': u, 'user_id': row['user'].id,
                          'h1': h1_total, 'h2': h2_total, 'total': t, 'hits': hits})
-    combined.sort(key=lambda x: (-x['total'], x['username']))
+    combined.sort(key=lambda x: _rank_key(x['total'], tiebreak[x['user_id']], x['username']))
     for i, r in enumerate(combined):
         r['rank'] = i + 1
     return combined
 
 
 def _render(mode, tab, half):
+    tb = _global_tiebreak()   # computed once, shared by every table below
     if mode == 'normal':
         data = {
-            'combined': _build(),
-            'races':    _build(race_type='race'),
-            'sprints':  _build(race_type='sprint'),
+            'combined': _build(tiebreak=tb),
+            'races':    _build(race_type='race', tiebreak=tb),
+            'sprints':  _build(race_type='sprint', tiebreak=tb),
         }
         return dict(mode='normal', tab=tab, half='overall', data=data)
     else:
-        h1 = {'combined': _build(1),
-              'races':    _build(1, 'race'),
-              'sprints':  _build(1, 'sprint')}
-        h2 = {'combined': _build(2),
-              'races':    _build(2, 'race'),
-              'sprints':  _build(2, 'sprint')}
-        overall = _tapia_overall(h1['combined'], h2['combined'])
+        h1 = {'combined': _build(1, tiebreak=tb),
+              'races':    _build(1, 'race', tiebreak=tb),
+              'sprints':  _build(1, 'sprint', tiebreak=tb)}
+        h2 = {'combined': _build(2, tiebreak=tb),
+              'races':    _build(2, 'race', tiebreak=tb),
+              'sprints':  _build(2, 'sprint', tiebreak=tb)}
+        overall = _tapia_overall(h1['combined'], h2['combined'], tb)
         show_overall = Setting.get('show_overall') == 'true'
         if not show_overall and half == 'overall':
             half = 'h1'
@@ -129,25 +177,60 @@ def index():
 
 def leaderPerWeek(season_half=None):
     """Leader after each completed race. With season_half (1 or 2) only that half's
-    races are included and the running totals start from zero at the half."""
-    q = Race.query.filter_by(season=Config.CURRENT_SEASON, is_completed=True)
-    if season_half is not None:
-        q = q.filter_by(season_half=season_half)
-    races = q.order_by(Race.race_date).all()
+    races are listed and the running points restart at the half. Ties are broken by
+    the player's season-to-date race/sprint hit counts across ALL races so far."""
+    all_races = (Race.query.filter_by(season=Config.CURRENT_SEASON, is_completed=True)
+                 .order_by(Race.race_date).all())
+    races = [r for r in all_races if season_half is None or r.season_half == season_half]
     users = User.query.order_by(User.username).all()
-    
-    race_ids = [r.id for r in races]
-    predictions = Prediction.query.filter(Prediction.race_id.in_(race_ids)).all()
-    results = RaceResult.query.filter(RaceResult.race_id.in_(race_ids)).all()
-    
-    pred_map = {(p.race_id, p.user_id): p for p in predictions}
-    res_map = {r.race_id: r for r in results}
-    
-    anotador = {user.id: 0 for user in users}
     lider = {}
-
     if not users:
         return races, lider
+
+    race_ids = [r.id for r in all_races]
+    pred_map = {(p.race_id, p.user_id): p
+                for p in Prediction.query.filter(Prediction.race_id.in_(race_ids)).all()}
+    res_map = {r.race_id: r for r in RaceResult.query.filter(RaceResult.race_id.in_(race_ids)).all()}
+
+    points = {u.id: 0 for u in users}                                     # scope points
+    tiebreak = {u.id: (_empty_hits(), _empty_hits()) for u in users}      # season-to-date hits
+    in_scope = {r.id for r in races}
+
+    for race in all_races:
+        result = res_map.get(race.id)
+        if result:
+            for user in users:
+                pred = pred_map.get((race.id, user.id))
+                if pred:
+                    pts = _count_hits(pred, result, race, *tiebreak[user.id])
+                    if race.id in in_scope:
+                        points[user.id] += pts
+        if race.id in in_scope:
+            lider[race.id] = min(users, key=lambda u: _rank_key(points[u.id], tiebreak[u.id], u.username))
+
+    return races, lider
+
+    def current_leader():
+        return min(users, key=lambda u: _rank_key(stats[u.id]['total'], stats[u.id]['race_hits'],
+                                                  stats[u.id]['sprint_hits'], u.username))
+
+    for race in races:
+        result = res_map.get(race.id)
+        if result:
+            rlist = [result.pos1, result.pos2, result.pos3, result.pos4, result.pos5]
+            for user in users:
+                pred = pred_map.get((race.id, user.id))
+                if not pred:
+                    continue
+                plist = [pred.pos1, pred.pos2, pred.pos3, pred.pos4, pred.pos5]
+                st = stats[user.id]
+                for i in range(race.max_positions):
+                    if plist[i] and rlist[i] and plist[i].lower() == rlist[i].lower():
+                        st['total'] += race.position_points[i]
+                        st['sprint_hits' if race.race_type == 'sprint' else 'race_hits'][i + 1] += 1
+        lider[race.id] = current_leader()
+
+    return races, lider
 
     for race in races:
         result = res_map.get(race.id)

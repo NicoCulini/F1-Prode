@@ -75,7 +75,7 @@
   <div class="quali-panel">
     <div class="card">
       <div class="card-header">
-        {% if race.race_type == 'sprint' %}Main qualifying{% else %}Qualifying{% endif %}
+        {% if race.race_type == 'sprint' %}Sprint qualifying{% else %}Qualifying{% endif %}
       </div>
       {% for q in qualifying %}
       <div class="quali-row" data-name="{{ q.name }}" title="Click to fill next empty slot">

@@ -1,7 +1,7 @@
 {% macro lb_table(rows, tab, compact=false) %}
 <div class="card">
   <div class="table-responsive">
-    <table class="table mb-0">
+    <table class="table mb-0 lb-table">
       <thead>
         <tr>
           <th style="width:40px">#</th>
@@ -42,13 +42,13 @@
                 {% set rv = row.race_hits[p] %}
                 {% set sv = row.sprint_hits[p] %}
                 {% if rv > 0 or sv > 0 %}
-                  <span style="white-space:nowrap"><span style="color:var(--accent);font-weight:700">{{ rv if rv > 0 else '—' }}</span>{% if sv > 0 %}<span style="font-size:.6em;color:var(--purple);font-weight:700;vertical-align:super;margin-left:1px">{{ sv }}</span>{% endif %}</span>
+                  <span style="white-space:nowrap"><span style="color:var(--green);font-weight:700">{{ rv if rv > 0 else '—' }}</span>{% if sv > 0 %}<span style="font-size:.6em;color:var(--purple);font-weight:700;vertical-align:super;margin-left:1px">{{ sv }}</span>{% endif %}</span>
                 {% else %}
                   <span style="color:var(--text-3)">—</span>
                 {% endif %}
               {% else %}
                 {% set v = row.hits[p] %}
-                {% if v > 0 %}<span style="color:var(--accent);font-weight:700">{{ v }}</span>
+                {% if v > 0 %}<span style="color:var(--green);font-weight:700">{{ v }}</span>
                 {% else %}<span style="color:var(--text-3)">—</span>{% endif %}
               {% endif %}
             </td>
@@ -57,7 +57,7 @@
             {% for p in [1,2,3] %}
             <td class="text-center">
               {% set v = row.hits[p] %}
-              {% if v > 0 %}<span style="color:var(--accent);font-weight:700">{{ v }}</span>
+              {% if v > 0 %}<span style="color:var(--green);font-weight:700">{{ v }}</span>
               {% else %}<span style="color:var(--text-3)">—</span>{% endif %}
             </td>
             {% endfor %}
@@ -76,7 +76,7 @@
 {% macro tapia_overall(overall) %}
 <div class="card">
   <div class="table-responsive">
-    <table class="table mb-0">
+    <table class="table mb-0 lb-table">
       <thead>
         <tr>
           <th style="width:40px">#</th>
@@ -104,7 +104,7 @@
           {% for p in [1,2,3,4,5] %}
           <td class="text-center">
             {% set v = row.hits[p] %}
-            {% if v > 0 %}<span style="color:var(--accent);font-weight:700">{{ v }}</span>
+            {% if v > 0 %}<span style="color:var(--green);font-weight:700">{{ v }}</span>
             {% else %}<span style="color:var(--text-3)">—</span>{% endif %}
           </td>
           {% endfor %}

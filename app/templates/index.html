@@ -5,32 +5,37 @@
 <div class="hero">
   <div class="season-pill">2026 Season</div>
   <h1 class="hero-title">F1 <span style="color:var(--accent)">Prode</span></h1>
-  <p style="color:var(--text-2);max-width:400px;margin:.5rem auto 2rem;font-size:.95rem">
-    Predict the top finishers after qualifying. Score points. Beat your friends.
-  </p>
+  <p class="hero-sub">Predict the top finishers after qualifying. Score points. Beat your friends.</p>
 
-  {% if current_user.is_authenticated %}
-    {% if next_race %}
-      <div style="margin-bottom:.75rem">
-        <a href="{{ url_for('predictions.predict', race_id=next_race.id) }}"
-           class="btn btn-danger btn-lg px-5" style="font-size:1rem;letter-spacing:.04em">
-          {{ 'Update prediction' if already_predicted else 'Predict' }}
-        </a>
-      </div>
-      <p style="font-size:.8rem;color:var(--text-3)">
-        {{ next_race.name }}
-        {% if next_race.race_date %}&mdash; {{ next_race.race_date.strftime('%d %b') }}{% endif %}
-      </p>
-    {% else %}
-      <p style="color:var(--text-3);font-size:.9rem">No upcoming races right now.</p>
-    {% endif %}
-  {% else %}
-    <div class="d-flex gap-2 justify-content-center">
-      <a href="{{ url_for('auth.register') }}" class="btn btn-danger px-4">Join now</a>
-      <a href="{{ url_for('auth.login') }}" class="btn btn-outline-secondary px-4">Sign in</a>
-    </div>
+  {% if not current_user.is_authenticated %}
+  <div class="d-flex gap-2 mt-4">
+    <a href="{{ url_for('auth.register') }}" class="btn btn-danger px-4">Join now</a>
+    <a href="{{ url_for('auth.login') }}" class="btn btn-outline-secondary px-4">Sign in</a>
+  </div>
   {% endif %}
 </div>
+
+{% if next_race %}
+<div class="next-race">
+  <div class="next-race-label">Next up · Round {{ next_race.round_number }}</div>
+  <div class="next-race-name">{{ next_race.name }}</div>
+  {% if next_race.race_date %}
+  <div class="next-race-date">{{ next_race.race_date.strftime('%A, %d %B') }}</div>
+  {% endif %}
+  {% if lock_iso %}
+  <div class="next-race-lock" id="lock-line" data-lock="{{ lock_iso }}">Predictions lock 2 hours before the start.</div>
+  {% endif %}
+  {% if current_user.is_authenticated %}
+  <a href="{{ url_for('predictions.predict', race_id=next_race.id) }}" class="btn btn-danger px-4">
+    {{ 'Update prediction' if already_predicted else 'Make your prediction' }}
+  </a>
+  {% else %}
+  <a href="{{ url_for('auth.login') }}" class="btn btn-danger px-4">Sign in to predict</a>
+  {% endif %}
+</div>
+{% else %}
+<div class="card mb-3"><div class="card-body text-center" style="color:var(--text-3)">No upcoming races right now.</div></div>
+{% endif %}
 
 {% if recent %}
 <div class="card">
@@ -82,4 +87,24 @@
     </p>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var el = document.getElementById('lock-line');
+  if (!el) return;
+  var lock = new Date(el.dataset.lock).getTime();
+  function tick() {
+    var ms = lock - Date.now();
+    if (ms <= 0) { el.innerHTML = 'Predictions are <strong>locked</strong>.'; return; }
+    var s = Math.floor(ms / 1000), d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600),
+        m = Math.floor(s % 3600 / 60), sec = s % 60;
+    var t = (d ? d + 'd ' : '') + (d || h ? h + 'h ' : '') + m + 'm' + (d ? '' : ' ' + sec + 's');
+    el.innerHTML = 'Predictions lock in <strong>' + t + '</strong>';
+    setTimeout(tick, 1000);
+  }
+  tick();
+})();
+</script>
 {% endblock %}

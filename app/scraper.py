@@ -15,18 +15,25 @@ logger = logging.getLogger(__name__)
 
 def _get(path, **params):
     """GET an OpenF1 endpoint, return parsed JSON list or raise RuntimeError.
-    Retries once on transient network errors (not on HTTP 4xx/5xx)."""
+    Retries on transient network errors and on 429 (OpenF1 rate-limits bursts of
+    requests); other HTTP errors are raised immediately."""
     query = {k: v for k, v in params.items() if v is not None}
     last_err = None
-    for attempt in range(2):
+    for attempt in range(3):
         try:
             resp = requests.get(f'{OPEN_F1}/{path}', params=query, timeout=TIMEOUT)
+            if resp.status_code == 429:
+                last_err = RuntimeError('429 Too Many Requests')
+                logger.warning('OpenF1 rate-limited (attempt %d/3) for %s %s', attempt + 1, path, query)
+                if attempt < 2:
+                    time.sleep(1.5 * (attempt + 1))
+                continue
             resp.raise_for_status()
             return resp.json()
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
             last_err = e
-            logger.warning('OpenF1 request failed (attempt %d/2) for %s %s: %s', attempt + 1, path, query, e)
-            if attempt == 0:
+            logger.warning('OpenF1 request failed (attempt %d/3) for %s %s: %s', attempt + 1, path, query, e)
+            if attempt < 2:
                 time.sleep(1)
         except Exception as e:
             logger.error('OpenF1 request error for %s %s: %s', path, query, e)
@@ -36,16 +43,26 @@ def _get(path, **params):
 
 # ── Meetings / session helpers ───────────────────────────────────────────────
 
+_MEETINGS_CACHE = {}      # season -> (monotonic_ts, meetings)
+_MEETINGS_TTL = 3600
+
+
 def _race_meetings(season):
-    """Return actual race meetings for the season — no testing, no cancellations — sorted by date."""
+    """Return actual race meetings for the season — no testing, no cancellations — sorted by date.
+    Cached for an hour: the calendar rarely changes and every session lookup needs it."""
+    cached = _MEETINGS_CACHE.get(season)
+    if cached and time.monotonic() - cached[0] < _MEETINGS_TTL:
+        return cached[1]
     meetings = _get('meetings', year=season)
-    return sorted(
+    result = sorted(
         [m for m in meetings
          if not m.get('is_cancelled')
          and 'testing'    not in m.get('meeting_name', '').lower()
          and 'pre-season' not in m.get('meeting_name', '').lower()],
         key=lambda m: m['date_start'],
     )
+    _MEETINGS_CACHE[season] = (time.monotonic(), result)
+    return result
 
 
 def _find_meeting(meetings, round_number, race_date=None):
@@ -243,6 +260,7 @@ def fetch_season_drivers(season):
 
 def fetch_season_schedule(season):
     """Fetch and upsert Race rows from OpenF1 meetings + sessions."""
+    _MEETINGS_CACHE.pop(season, None)   # always import from fresh data
     try:
         meetings = _race_meetings(season)
         if not meetings:

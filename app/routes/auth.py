@@ -1,4 +1,5 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
+import os
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, send_file, abort
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
@@ -8,6 +9,29 @@ from app.models import User
 auth_bp = Blueprint('auth', __name__)
 
 RESET_MAX_AGE = 3600  # seconds
+AVATAR_MAX_BYTES = 2 * 1024 * 1024
+
+
+def _avatar_dir():
+    return os.path.join(current_app.instance_path, 'avatars')
+
+
+def _sniff_image_ext(data):
+    """Return 'png'/'jpg'/'webp' from magic bytes, else None (SVG etc. are rejected on purpose)."""
+    if data.startswith(b'\x89PNG\r\n\x1a\n'):
+        return 'png'
+    if data.startswith(b'\xff\xd8\xff'):
+        return 'jpg'
+    if data[:4] == b'RIFF' and data[8:12] == b'WEBP':
+        return 'webp'
+    return None
+
+
+def _remove_avatar_files(user_id):
+    for ext in ('png', 'jpg', 'webp'):
+        path = os.path.join(_avatar_dir(), f'{user_id}.{ext}')
+        if os.path.exists(path):
+            os.remove(path)
 
 
 def _reset_serializer():
@@ -129,6 +153,49 @@ def reset_password(token):
             flash('Password updated. You can sign in now.', 'success')
             return redirect(url_for('auth.login'))
     return render_template('auth/reset_password.html', username=user.username)
+
+
+@auth_bp.route('/avatar/<int:user_id>')
+def avatar(user_id):
+    """Uploaded picture, else the bundled static/img/users/<username>.png, else the default."""
+    for ext in ('png', 'jpg', 'webp'):
+        path = os.path.join(_avatar_dir(), f'{user_id}.{ext}')
+        if os.path.exists(path):
+            return send_file(path, max_age=0)
+    user = User.query.get(user_id)
+    if not user:
+        abort(404)
+    static_dir = os.path.join(current_app.static_folder, 'img')
+    legacy = os.path.join(static_dir, 'users', f'{user.username.lower()}.png')
+    if os.path.exists(legacy):
+        return send_file(legacy, max_age=0)
+    return send_file(os.path.join(static_dir, 'default-avatar.webp'), max_age=0)
+
+
+@auth_bp.route('/change-avatar', methods=['POST'])
+@login_required
+def change_avatar():
+    if request.form.get('remove'):
+        _remove_avatar_files(current_user.id)
+        flash('Profile picture removed.', 'success')
+        return redirect(url_for('auth.change_password'))
+    file = request.files.get('avatar')
+    data = file.read(AVATAR_MAX_BYTES + 1) if file else b''
+    if not data:
+        flash('Choose an image first.', 'danger')
+    elif len(data) > AVATAR_MAX_BYTES:
+        flash('Image is too large (max 2 MB).', 'danger')
+    else:
+        ext = _sniff_image_ext(data)
+        if not ext:
+            flash('Use a PNG, JPG or WebP image.', 'danger')
+        else:
+            os.makedirs(_avatar_dir(), exist_ok=True)
+            _remove_avatar_files(current_user.id)
+            with open(os.path.join(_avatar_dir(), f'{current_user.id}.{ext}'), 'wb') as f:
+                f.write(data)
+            flash('Profile picture updated.', 'success')
+    return redirect(url_for('auth.change_password'))
 
 
 @auth_bp.route('/logout')

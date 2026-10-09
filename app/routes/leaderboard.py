@@ -154,8 +154,10 @@ def index():
     mode = request.args.get('mode', 'tapia')
     tab  = request.args.get('tab',  'combined')
     half = request.args.get('half', _current_half())
-    history_races, history_lider = leaderPerWeek()
     ctx = _render(mode, tab, half, _live_race())
+    # In Tapia mode the half tabs scope the history; 'overall' (and normal mode) show the whole season.
+    season_half = {'h1': 1, 'h2': 2}.get(ctx['half']) if mode == 'tapia' else None
+    history_races, history_lider = leaderPerWeek(season_half)
     ctx['history_races'] = history_races
     ctx['history_lider'] = history_lider
     return render_template('leaderboard/index.html', **ctx)
@@ -170,12 +172,18 @@ def live_refresh():
     return render_template('leaderboard/_table.html', **ctx)
 
 
-def leaderPerWeek():
-    races = Race.query.filter_by(season=Config.CURRENT_SEASON, is_completed=True).order_by(Race.race_date).all()
+def leaderPerWeek(season_half=None):
+    """Leader after each completed race. With season_half (1 or 2) only that half's
+    races are included and the running totals start from zero at the half."""
+    q = Race.query.filter_by(season=Config.CURRENT_SEASON, is_completed=True)
+    if season_half is not None:
+        q = q.filter_by(season_half=season_half)
+    races = q.order_by(Race.race_date).all()
     users = User.query.order_by(User.username).all()
     
-    predictions = Prediction.query.join(Race).filter(Race.season == Config.CURRENT_SEASON, Race.is_completed == True).all()
-    results = RaceResult.query.join(Race).filter(Race.season == Config.CURRENT_SEASON, Race.is_completed == True).all()
+    race_ids = [r.id for r in races]
+    predictions = Prediction.query.filter(Prediction.race_id.in_(race_ids)).all()
+    results = RaceResult.query.filter(RaceResult.race_id.in_(race_ids)).all()
     
     pred_map = {(p.race_id, p.user_id): p for p in predictions}
     res_map = {r.race_id: r for r in results}

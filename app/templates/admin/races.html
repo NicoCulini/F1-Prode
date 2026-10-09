@@ -76,6 +76,8 @@
               {% endif %}
               <a href="{{ url_for('admin.fetch_result', race_id=race.id) }}"
                  class="btn btn-xs btn-outline-secondary" title="Fetch result from API">↓</a>
+              <a href="{{ url_for('admin.assign_predictions', race_id=race.id) }}"
+                 class="btn btn-xs btn-outline-secondary" title="Assign user predictions">👤</a>
               <button class="btn btn-xs btn-outline-secondary" title="Enter result manually"
                       data-bs-toggle="modal" data-bs-target="#modal{{ race.id }}">✎</button>
             </div>

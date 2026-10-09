@@ -48,7 +48,21 @@ def _race_meetings(season):
     )
 
 
-def _find_session(season, round_number, session_type, session_name=None):
+def _find_meeting(meetings, round_number, race_date=None):
+    """Pick the OpenF1 meeting for a race. Matches by date (race falls within the
+    meeting weekend) because OpenF1 can list extra/placeholder meetings that shift
+    list positions; falls back to round-number index when no date is available."""
+    if race_date:
+        for m in meetings:
+            start = _parse_dt(m['date_start'])
+            if start and 0 <= (race_date - start).total_seconds() <= 5 * 86400:
+                return m
+    if 1 <= round_number <= len(meetings):
+        return meetings[round_number - 1]
+    return None
+
+
+def _find_session(season, round_number, session_type, session_name=None, race_date=None):
     """Return the session dict for a given round number + session type, or None.
     Pass session_name to disambiguate when multiple sessions share a type
     (e.g. both 'Race' and 'Sprint' have session_type='Race' on a sprint weekend;
@@ -57,9 +71,10 @@ def _find_session(season, round_number, session_type, session_name=None):
     ordering guarantee and there can be more than one match per type.
     """
     meetings = _race_meetings(season)
-    if round_number < 1 or round_number > len(meetings):
+    meeting = _find_meeting(meetings, round_number, race_date)
+    if not meeting:
         return None
-    meeting_key = meetings[round_number - 1]['meeting_key']
+    meeting_key = meeting['meeting_key']
     sessions = _get('sessions', meeting_key=meeting_key, session_type=session_type)
     if session_name:
         sessions = [s for s in sessions if s.get('session_name') == session_name]
@@ -90,7 +105,7 @@ def fetch_qualifying_top10(race):
     try:
         session_name = 'Sprint Qualifying' if race.race_type == 'sprint' else 'Qualifying'
         session = _find_session(race.season, race.round_number, 'Qualifying',
-                                session_name=session_name)
+                                session_name=session_name, race_date=race.race_date)
         if not session:
             return []
         sk = session['session_key']
@@ -125,7 +140,7 @@ def fetch_race_result(race):
     try:
         session_name = 'Sprint' if race.race_type == 'sprint' else 'Race'
         session = _find_session(race.season, race.round_number, 'Race',
-                                session_name=session_name)
+                                session_name=session_name, race_date=race.race_date)
         if not session:
             return False, 'Session not found for this round.'
         if session.get('session_name') != session_name:
@@ -194,7 +209,7 @@ def fetch_live_positions(race):
     try:
         session_name = 'Sprint' if race.race_type == 'sprint' else 'Race'
         session = _find_session(race.season, race.round_number, 'Race',
-                                session_name=session_name)
+                                session_name=session_name, race_date=race.race_date)
         if not session or session.get('session_name') != session_name:
             return cached[1] if cached else None
         sk = session['session_key']
@@ -270,30 +285,30 @@ def fetch_season_schedule(season):
         mk          = meeting['meeting_key']
         slist       = by_meeting.get(mk, [])
 
-        race_s    = next((s for s in slist if s['session_type'] == 'Race'),   None)
-        sprint_s  = next((s for s in slist if s['session_type'] == 'Sprint'), None)
+        # Sprint and main race both have session_type 'Race' on OpenF1; tell them apart by name.
+        race_s    = next((s for s in slist if s.get('session_name') == 'Race'),   None)
+        sprint_s  = next((s for s in slist if s.get('session_name') == 'Sprint'), None)
         race_date = _parse_dt(race_s['date_start'] if race_s else meeting['date_start'])
 
-        if not Race.query.filter_by(season=season, round_number=round_num, race_type='race').first():
+        for kind, sess in (('race', race_s), ('sprint', sprint_s)):
+            if kind == 'sprint' and not sess:
+                continue
+            when = _parse_dt(sess['date_start']) if sess else race_date
+            # Match by type + date, not round number: OpenF1 can insert meetings that
+            # shift numbering, and re-importing must not create duplicates.
+            candidates = [r for r in Race.query.filter_by(season=season, race_type=kind).all()
+                          if r.race_date and when and abs((r.race_date - when).total_seconds()) < 3 * 86400]
+            existing = min(candidates, key=lambda r: abs((r.race_date - when).total_seconds()), default=None)
+            if existing:
+                existing.round_number = round_num
+                continue
+            name = meeting['meeting_name']
             db.session.add(Race(
-                name=meeting['meeting_name'],
+                name=name.replace('Grand Prix', 'Sprint') if kind == 'sprint' else name,
                 round_number=round_num,
                 season=season,
-                race_date=race_date,
-                race_type='race',
-                season_half=season_half,
-                is_completed=False,
-                predictions_open=True,
-            ))
-            added += 1
-
-        if sprint_s and not Race.query.filter_by(season=season, round_number=round_num, race_type='sprint').first():
-            db.session.add(Race(
-                name=meeting['meeting_name'].replace('Grand Prix', 'Sprint'),
-                round_number=round_num,
-                season=season,
-                race_date=_parse_dt(sprint_s['date_start']),
-                race_type='sprint',
+                race_date=when,
+                race_type=kind,
                 season_half=season_half,
                 is_completed=False,
                 predictions_open=True,

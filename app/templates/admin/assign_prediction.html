@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Assign predictions — Admin{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <a href="{{ url_for('admin.races') }}" style="font-size:.85rem;color:var(--text-secondary)">← Races</a>
+</div>
+
+<h4 class="page-title mb-1">Assign prediction</h4>
+<p style="color:var(--text-2);font-size:.875rem;margin-bottom:1.5rem">
+  {{ race.name }} · Round {{ race.round_number }} · {{ race.race_type }}
+  {% if race.is_completed %}· completed{% endif %}
+  — ignores the lock; overwrites any existing prediction.
+</p>
+
+<div class="row">
+  <div class="col-sm-10 col-md-6 col-lg-5">
+    <div class="card mb-3">
+      <div class="card-header">User</div>
+      <div class="card-body">
+        <form method="GET">
+          <select name="user_id" class="form-select" onchange="this.form.submit()">
+            <option value="">— Select user —</option>
+            {% for u in users %}
+            <option value="{{ u.id }}" {% if selected and selected.id == u.id %}selected{% endif %}>{{ u.username }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+    </div>
+
+    {% if selected %}
+    <div class="card">
+      <div class="card-header">
+        {{ selected.username }}'s top {{ race.max_positions }}
+        {% if existing %}<span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted);font-size:.78rem;margin-left:.5rem">existing — {{ existing.score }} pts</span>{% endif %}
+      </div>
+      <div class="card-body">
+        <form method="POST">
+          <input type="hidden" name="user_id" value="{{ selected.id }}">
+          {% for i in range(1, race.max_positions + 1) %}
+          {% set cur = existing['pos' ~ i] if existing is not none else None %}
+          <div class="position-item">
+            <span class="pos-number {% if i >= 4 %}pos-{{ i }}{% endif %}">{{ i }}</span>
+            <div style="flex:1">
+              <select name="pos{{ i }}" class="form-select driver-select" required>
+                <option value="">— Select driver —</option>
+                {% for d in drivers %}
+                <option value="{{ d.family_name }}" {% if cur == d.family_name %}selected{% endif %}>{{ d.family_name }}{% if d.given_name %} {{ d.given_name[:1] }}.{% endif %}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <span class="pts-chip">+{{ race.position_points[i-1] }}</span>
+          </div>
+          {% endfor %}
+          <div class="mt-4">
+            <button type="submit" class="btn btn-danger w-100">{{ 'Overwrite prediction' if existing else 'Save prediction' }}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const selects = document.querySelectorAll('.driver-select');
+  function syncOptions() {
+    const chosen = Array.from(selects).map(s => s.value).filter(Boolean);
+    selects.forEach(sel => Array.from(sel.options).forEach(opt => {
+      if (opt.value) opt.disabled = chosen.includes(opt.value) && opt.value !== sel.value;
+    }));
+  }
+  selects.forEach(s => s.addEventListener('change', syncOptions));
+  syncOptions();
+</script>
+{% endblock %}

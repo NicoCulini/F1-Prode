@@ -1,10 +1,33 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from app import db
 from app.models import User
 
 auth_bp = Blueprint('auth', __name__)
+
+RESET_MAX_AGE = 3600  # seconds
+
+
+def _reset_serializer():
+    return URLSafeTimedSerializer(current_app.config['SECRET_KEY'], salt='password-reset')
+
+
+def make_reset_token(user):
+    # Embeds a slice of the current hash, so the link dies once the password changes.
+    return _reset_serializer().dumps({'id': user.id, 'h': user.password_hash[-12:]})
+
+
+def user_from_reset_token(token):
+    try:
+        data = _reset_serializer().loads(token, max_age=RESET_MAX_AGE)
+    except (BadSignature, SignatureExpired):
+        return None
+    user = User.query.get(data.get('id'))
+    if user and user.password_hash[-12:] == data.get('h'):
+        return user
+    return None
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
@@ -85,6 +108,27 @@ def change_password():
             flash('Password updated successfully.', 'success')
             return redirect(url_for('main.index'))
     return render_template('auth/change_password.html')
+
+
+@auth_bp.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    user = user_from_reset_token(token)
+    if not user:
+        flash('This reset link is invalid or has expired. Ask an admin for a new one.', 'danger')
+        return redirect(url_for('auth.login'))
+    if request.method == 'POST':
+        new_pw  = request.form.get('new_password', '')
+        confirm = request.form.get('confirm', '')
+        if len(new_pw) < 6:
+            flash('New password must be at least 6 characters.', 'danger')
+        elif new_pw != confirm:
+            flash('Passwords do not match.', 'danger')
+        else:
+            user.password_hash = generate_password_hash(new_pw)
+            db.session.commit()
+            flash('Password updated. You can sign in now.', 'success')
+            return redirect(url_for('auth.login'))
+    return render_template('auth/reset_password.html', username=user.username)
 
 
 @auth_bp.route('/logout')

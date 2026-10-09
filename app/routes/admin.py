@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
+from datetime import datetime
 from functools import wraps
 from app import db
 from app.models import Race, Driver, RaceResult, Prediction, User, Setting
@@ -234,3 +235,55 @@ def toggle_admin(user_id):
         db.session.commit()
         flash(f"Admin status {'granted to' if user.is_admin else 'removed from'} {user.username}.", 'success')
     return redirect(url_for('admin.users'))
+
+
+@admin_bp.route('/users/<int:user_id>/reset-link', methods=['POST'])
+@admin_required
+def reset_link(user_id):
+    from app.routes.auth import make_reset_token
+    user = User.query.get_or_404(user_id)
+    link = url_for('auth.reset_password', token=make_reset_token(user), _external=True)
+    all_users = User.query.order_by(User.username).all()
+    return render_template('admin/users.html', users=all_users, reset_user=user, reset_link=link)
+
+
+@admin_bp.route('/races/<int:race_id>/predictions', methods=['GET', 'POST'])
+@admin_required
+def assign_predictions(race_id):
+    """Create or overwrite any user's prediction for any race (ignores lock/open state)."""
+    race = Race.query.get_or_404(race_id)
+    users = User.query.order_by(User.username).all()
+    drivers = (Driver.query.filter_by(season=race.season)
+               .order_by(Driver.family_name).all())
+
+    user_id = request.values.get('user_id', type=int)
+    selected = User.query.get(user_id) if user_id else None
+
+    if request.method == 'POST':
+        if not selected:
+            flash('Pick a user.', 'danger')
+        else:
+            positions = [request.form.get(f'pos{i}', '').strip() or None
+                         for i in range(1, race.max_positions + 1)]
+            if not all(positions):
+                flash('Please fill in all positions.', 'danger')
+            elif len(set(positions)) < len(positions):
+                flash('Each driver can only be picked once.', 'danger')
+            else:
+                padded = positions + [None] * (5 - len(positions))
+                pred = Prediction.query.filter_by(user_id=selected.id, race_id=race.id).first()
+                if not pred:
+                    pred = Prediction(user_id=selected.id, race_id=race.id)
+                    db.session.add(pred)
+                pred.pos1, pred.pos2, pred.pos3, pred.pos4, pred.pos5 = padded
+                pred.submitted_at = datetime.utcnow()
+                db.session.flush()
+                pred.score = pred.calculate_score()
+                db.session.commit()
+                flash(f"Prediction saved for {selected.username} — {race.name} ({pred.score} pts).", 'success')
+                return redirect(url_for('admin.assign_predictions', race_id=race.id, user_id=selected.id))
+
+    existing = (Prediction.query.filter_by(user_id=selected.id, race_id=race.id).first()
+                if selected else None)
+    return render_template('admin/assign_prediction.html', race=race, users=users,
+                           drivers=drivers, selected=selected, existing=existing)

@@ -98,7 +98,26 @@ def _final_positions(session_key):
 
 # ── Public functions ─────────────────────────────────────────────────────────
 
+_QUALI_CACHE = {}        # race_id -> (monotonic_ts, rows)
+_QUALI_TTL_FOUND = 600   # seconds — final qualifying order doesn't change
+_QUALI_TTL_EMPTY = 60    # not available yet (or API error): retry soon, but not on every page view
+
+
 def fetch_qualifying_top10(race):
+    """Cached wrapper: each uncached lookup costs ~4 OpenF1 requests, and the
+    predict page calls this on every view and submit."""
+    now = time.monotonic()
+    cached = _QUALI_CACHE.get(race.id)
+    if cached:
+        ttl = _QUALI_TTL_FOUND if cached[1] else _QUALI_TTL_EMPTY
+        if now - cached[0] < ttl:
+            return cached[1]
+    rows = _fetch_qualifying_top10(race)
+    _QUALI_CACHE[race.id] = (now, rows)
+    return rows
+
+
+def _fetch_qualifying_top10(race):
     """Return up to 10 dicts {pos, name, given, code, team} from qualifying.
     For sprint races uses Sprint Qualifying (shootout); for main races uses Qualifying.
     """
@@ -189,46 +208,6 @@ def fetch_race_result(race):
     except Exception as e:
         db.session.rollback()
         return False, str(e)
-
-
-_LIVE_CACHE = {}       # race_id -> (monotonic_ts, [names])
-_LIVE_CACHE_TTL = 8    # seconds — just under the 10s frontend poll interval
-
-
-def fetch_live_positions(race):
-    """Return an ordered list of driver last names (top race.max_positions) for
-    the race's in-progress session, or None if unavailable. Never writes to the
-    DB — this is a provisional read used only to render live standings.
-    Briefly cached so rapid polling doesn't hammer OpenF1; falls back to the
-    last good cached value on error instead of raising."""
-    now = time.monotonic()
-    cached = _LIVE_CACHE.get(race.id)
-    if cached and now - cached[0] < _LIVE_CACHE_TTL:
-        return cached[1]
-
-    try:
-        session_name = 'Sprint' if race.race_type == 'sprint' else 'Race'
-        session = _find_session(race.season, race.round_number, 'Race',
-                                session_name=session_name, race_date=race.race_date)
-        if not session or session.get('session_name') != session_name:
-            return cached[1] if cached else None
-        sk = session['session_key']
-
-        positions = _final_positions(sk)
-        if not positions:
-            return cached[1] if cached else None
-
-        driver_map = {d['driver_number']: d
-                      for d in _get('drivers', session_key=sk)}
-
-        ordered = sorted(positions.items(), key=lambda x: x[1])[:race.max_positions]
-        names = [driver_map.get(dn, {}).get('last_name', str(dn)) for dn, _ in ordered]
-    except Exception as e:
-        logger.warning('fetch_live_positions failed for race %s: %s', race.id, e)
-        return cached[1] if cached else None
-
-    _LIVE_CACHE[race.id] = (now, names)
-    return names
 
 
 def fetch_season_drivers(season):
